@@ -1,0 +1,153 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling", "hatch-vcs"]
+
+[project]
+name = "flash-preprocess"
+description = "Flash flood data preprocessor."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Leo Lonzarich", email = "lglonzaric@gmail.com"},
+    { name = "Jessica Keiser" },
+    { name = "Aziz Rahman" },
+]
+maintainers = [
+    { name = "Leo Lonzarich", email = "lglonzaric@gmail.com" },
+    { name = "Jessica Keiser" },
+    { name = "Aziz Rahman" },
+]
+requires-python = ">=3.9.0"
+dynamic = ["version"]
+keywords = [
+    "hydrology",
+    "flash-flood",
+    "hydrologic-modeling",
+    "nextgen",
+    "meteorology",
+    "differentiable-modeling",
+    "scientific-computing",
+]
+dependencies = [
+    "dask",
+    "geopandas",
+    "h5netcdf",
+    "netcdf4",
+    "numpy",
+    "pandas",
+    "shapely",
+    "s3fs",
+    "tqdm",
+    "xarray",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Hydrology",
+]
+
+[project.urls]
+Repository = "https://github.com/mhpi/flash-preprocess"
+# Documentation = "https://github.com/mhpi/flash-preprocess/tree/master/docs"
+Issues = "https://github.com/mhpi/flash-preprocess/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "ruff",
+]
+
+[tool.hatch]
+version.source = "vcs"
+build.hooks.vcs.version-file = "src/flash_preprocess/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flash_preprocess"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+xfail_strict = true
+addopts = [
+    "--import-mode=importlib",  # allow using test files with same name
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 88
+lint.select = [
+    "F",  # Errors detected by Pyflakes
+    "E",  # Error detected by Pycodestyle
+    "W",  # Warning detected by Pycodestyle
+    "I",  # isort
+    "D",  # pydocstyle
+    "B",  # flake8-bugbear
+    "TID",  # flake8-tidy-imports
+    "C4",  # flake8-comprehensions
+    "BLE",  # flake8-blind-except
+    "UP",  # pyupgrade
+    "RUF100",  # Report unused noqa directives
+    "COM812",  # Missing trailing comma
+]
+exclude = [
+    ".git",
+    ".vscode",
+    "archive",
+    "dev",
+]
+lint.ignore = [
+    # Do not perform function call in argument defaults
+    "B008",
+    # Line too long
+    "E501",
+    # Do not assign a lambda expression, use a def
+    "E731",
+    # Missing docstring in public module
+    "D100",
+    # Missing docstring in public package
+    "D104",
+    # Missing docstring in magic method
+    "D105",
+    # Missing docstring in __init__
+    "D107",
+    # Blank lines before class docstring
+    "D203",
+    # 1 blank line required after class docstring
+    "D204",
+    # 1 blank line required between summary line and description
+    "D205",
+    # First line of docstring should be in imperative mood
+    "D401",
+    # Import block is un-sorted or un-formatted; Conflicts with isort
+    "I001",
+    # Blank line contains whitespace
+    "W293",
+    # Disable checks on | operator notation in type hints
+    "UP007",
+    # Use `X | None` for type annotations
+    "UP045",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"docs/*" = ["I"]
+"tests/*" = ["D"]
+"*/__init__.py" = ["F401"]
+"*.ipynb" = ["E402", "E501", "F401", "F811", "F841", "T201", "D103", "BLE001"]
+
+[tool.ruff.format]
+quote-style = "preserve"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["flash-preprocess"]
+combine-as-imports = true
