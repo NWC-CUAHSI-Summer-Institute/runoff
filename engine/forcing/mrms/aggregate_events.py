@@ -5,13 +5,14 @@ one (event, time_step, catchment) dataset padded to the longest event.
 
 Output
 ------
-  depth_mm_15min  (event, time_step, catchment)  f32     NaN outside valid range
+  P               (event, time_step, catchment)  f32     NaN outside valid range
   storm_id        (event,)                       i32
   n_steps         (event,)                       i32     actual valid timestep count
-  event_start     (event,)                       f64     time of step 0 (source units)
+  ts_start        (event,)                       f64     time of step 0 (source units)
+  ts_end          (event,)                       f64     time of last valid step (source units)
   divide_id       (catchment,)                   str
 
-  Downstream: slice depth_mm_15min[i, :n_steps[i], :] to unpad an event.
+  Downstream: slice P[i, :n_steps[i], :] to unpad an event.
 
 Usage
 -----
@@ -61,23 +62,24 @@ def _scan_files(input_dir: str, pattern: str, allowed_ids: set | None) -> list[d
     return records
 
 
-def _read_meta(records: list[dict]) -> tuple[np.ndarray, int, np.ndarray]:
-    """First pass: read n_steps and event_start from each file.
+def _read_meta(records: list[dict]) -> tuple[np.ndarray, int, np.ndarray, np.ndarray]:
+    """First pass: read n_steps and time bounds from each file.
 
     Returns
     -------
     n_steps_arr   int32 array (n_events,)
     max_steps     int
-    event_starts  float64 array (n_events,)  time[0] in source units
+    ts_starts     float64 array (n_events,)  time[0] in source units
+    catchments_ref
     """
     n_steps_arr = np.empty(len(records), dtype=np.int32)
-    event_starts = np.empty(len(records), dtype=np.float64)
+    ts_starts = np.empty(len(records), dtype=np.float64)
     catchments_ref = None
 
     for i, rec in enumerate(records):
         ds = netCDF4.Dataset(rec['path'], "r")
         n_steps_arr[i] = ds.dimensions['time'].size
-        event_starts[i] = float(ds.variables['time'][0])
+        ts_starts[i] = float(ds.variables['time'][0])
 
         cats = ds.variables['divide_id'][:]
         if catchments_ref is None:
@@ -92,7 +94,7 @@ def _read_meta(records: list[dict]) -> tuple[np.ndarray, int, np.ndarray]:
 
         ds.close()
 
-    return n_steps_arr, int(n_steps_arr.max()), event_starts, catchments_ref
+    return n_steps_arr, int(n_steps_arr.max()), ts_starts, catchments_ref
 
 
 def main():
@@ -126,8 +128,13 @@ def main():
     )
     parser.add_argument(
         "--var",
+        default="P",
+        help="Output variable name (default: P)",
+    )
+    parser.add_argument(
+        "--src-var",
         default="depth_mm_15min",
-        help="Variable name to aggregate (default: depth_mm_15min)",
+        help="Variable name in source files to read (default: depth_mm_15min)",
     )
     parser.add_argument(
         "--complevel",
@@ -176,7 +183,7 @@ def main():
     print(f"Found {len(records)} events in {args.input_dir}")
 
     # first pass: collect metadata
-    n_steps_arr, max_steps, event_starts, catchments = _read_meta(records)
+    n_steps_arr, max_steps, ts_starts, catchments = _read_meta(records)
     n_events = len(records)
     n_catchments = len(catchments)
     print(
@@ -205,10 +212,15 @@ def main():
     v_ns.long_name = "number of valid 15-min timesteps in this event"
     v_ns[:] = n_steps_arr
 
-    v_es = nc_out.createVariable('event_start', 'f8', ('event',))
-    v_es.units = time_units
-    v_es.long_name = "time of first timestep (step 0) for each event"
-    v_es[:] = event_starts
+    v_ts = nc_out.createVariable('ts_start', 'f8', ('event',))
+    v_ts.units = time_units
+    v_ts.long_name = "start time of the 5-day timeseries window (time step 0)"
+    v_ts[:] = ts_starts
+
+    v_te = nc_out.createVariable('ts_end', 'f8', ('event',))
+    v_te.units = time_units
+    v_te.long_name = "end time of the 5-day timeseries window (time step n_steps-1)"
+    v_te[:] = ts_starts + (n_steps_arr - 1) * 15.0
 
     v_cat = nc_out.createVariable('divide_id', str, ('catchment',))
     v_cat.long_name = "NextGen catchment ID"
@@ -227,14 +239,14 @@ def main():
         complevel=args.complevel,
         chunksizes=(chunk_e, chunk_t, chunk_c),
     )
-    v_data.units = "mm per 15 min"
+    v_data.units = "mm [15 min]-1"
     v_data.long_name = "MRMS precipitation depth"
-    v_data.coordinates = "storm_id event_start divide_id"
+    v_data.coordinates = "storm_id n_steps ts_start ts_end divide_id"
 
     # second pass: stream each event into the output
     for i, rec in enumerate(records):
         ds = netCDF4.Dataset(rec['path'], 'r')
-        data = ds.variables[args.var][:]  # (time, catchment)
+        data = ds.variables[args.src_var][:]  # (time, catchment)
         ds.close()
         # transpose to (catchment, time) then write (event, time_step, catchment)
         n = data.shape[0]

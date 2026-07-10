@@ -12,17 +12,20 @@ block below). This script:
 Output
 ------
   Coordinates:
-    event_id    (event,)     str     shared AORC/MRMS event ID
-    n_steps     (event,)     i32     valid 15-min steps (minimum of both sources)
-    event_start (event,)     f64     step-0 time from AORC (minutes since 1970-01-01)
-    catchment   (catchment,) str     NextGen divide ID (intersection of both files)
-    latitude    (catchment,) f32
-    longitude   (catchment,) f32
+    event_id        (event,)     str     shared AORC/MRMS event ID
+    n_steps         (event,)     i32     valid 15-min steps (minimum of both sources)
+    ts_start        (event,)     f64     start of the 5-day window (minutes since 1970-01-01)
+    ts_end          (event,)     f64     end of the 5-day window (minutes since 1970-01-01)
+    event_gage_id   (event,)     str     zero-padded 8-digit USGS gauge downstream of event
+    event_divide_id (event,)     str     NextGen catchment ID downstream of event
+    catchment       (catchment,) str     NextGen divide ID (intersection of both files)
+    latitude        (catchment,) f32
+    longitude       (catchment,) f32
 
   Variables:
-    TMP_2maboveground  (event, time_step, catchment)  f32  from AORC
+    P     (event, time_step, catchment)  f32  from MRMS
+    T               (event, time_step, catchment)  f32  from AORC
     PET                (event, time_step, catchment)  f32  from AORC
-    depth_mm_15min     (event, time_step, catchment)  f32  from MRMS
 
 Usage
 -----
@@ -44,7 +47,7 @@ import pandas as pd
 # index) instead of `event_id` — this should be fixed upstream so the two
 # files share a real `event_id`. Until then, translate storm_id -> event_id
 # here using the original manifest's storm_index/event_ids crosswalk.
-_TEMP_MANIFEST = "data/events_original.csv"
+_TEMP_MANIFEST = "/Users/leoglonz/Desktop/noaa/data/upper_neuse/events.csv"
 _TEMP_STORM_COL = "storm_index"
 _TEMP_EVENT_COL = "event_ids"
 ##################
@@ -148,7 +151,7 @@ def main() -> None:
     )
 
     # align catchments: inner join, report drops from each side
-    aorc_cats = _load_str_var(nc_aorc, "catchment")
+    aorc_cats = _load_str_var(nc_aorc, "divide_id")
     mrms_cats = _load_str_var(nc_mrms, "divide_id")
     aorc_set = set(aorc_cats)
     mrms_set = set(mrms_cats)
@@ -186,9 +189,12 @@ def main() -> None:
     # read n_steps and event_start from AORC; n_steps from MRMS for crosscheck
     aorc_n_steps = np.array(nc_aorc.variables["n_steps"][:], dtype=np.int32)
     mrms_n_steps = np.array(nc_mrms.variables["n_steps"][:], dtype=np.int32)
-    aorc_starts = np.array(nc_aorc.variables["event_start"][:], dtype=np.float64)
+    aorc_ts_starts = np.array(nc_aorc.variables["ts_start"][:], dtype=np.float64)
+    aorc_ts_ends = np.array(nc_aorc.variables["ts_end"][:], dtype=np.float64)
     aorc_lats = np.array(nc_aorc.variables["latitude"][:], dtype=np.float32)
     aorc_lons = np.array(nc_aorc.variables["longitude"][:], dtype=np.float32)
+    aorc_gage_ids = _load_str_var(nc_aorc, "event_gage_id")
+    aorc_divide_ids = _load_str_var(nc_aorc, "event_divide_id")
 
     out_n_steps = np.minimum(
         aorc_n_steps[aorc_indices],
@@ -210,12 +216,25 @@ def main() -> None:
     v.long_name = "valid 15-min timesteps (min of AORC and MRMS coverage)"
     v[:] = out_n_steps
 
-    v = nc_out.createVariable("event_start", "f8", ("event",))
+    v = nc_out.createVariable("ts_start", "f8", ("event",))
     v.units = "minutes since 1970-01-01 00:00:00 UTC"
-    v.long_name = "time of step 0 for each event (from AORC window)"
-    v[:] = aorc_starts[aorc_indices]
+    v.long_name = "start of the 5-day timeseries window (from AORC, time step 0)"
+    v[:] = aorc_ts_starts[aorc_indices]
 
-    v = nc_out.createVariable("catchment", str, ("catchment",))
+    v = nc_out.createVariable("ts_end", "f8", ("event",))
+    v.units = "minutes since 1970-01-01 00:00:00 UTC"
+    v.long_name = "end of the 5-day timeseries window (from AORC, time step n_steps-1)"
+    v[:] = aorc_ts_ends[aorc_indices]
+
+    v = nc_out.createVariable("event_gage_id", str, ("event",))
+    v.long_name = "zero-padded 8-digit USGS gauge ID downstream of this event"
+    v[:] = aorc_gage_ids[aorc_indices]
+
+    v = nc_out.createVariable("event_divide_id", str, ("event",))
+    v.long_name = "NextGen catchment ID downstream of this event"
+    v[:] = aorc_divide_ids[aorc_indices]
+
+    v = nc_out.createVariable("divide_id", str, ("catchment",))
     v.long_name = "NextGen catchment ID"
     v[:] = np.array(common, dtype=object)
 
@@ -260,27 +279,36 @@ def main() -> None:
         )
         nv.units = units
         nv.long_name = long_name
+        nv.coordinates = "event_id n_steps ts_start ts_end event_gage_id event_divide_id divide_id latitude longitude"
         return nv
 
-    v_tmp = _make_var("TMP_2maboveground", "K", "Air temperature at 2 m (interpolated)")
+    v_dep = _make_var(
+        "P",
+        "mm [15 min]-1",
+        "MRMS precipitation depth"
+    )
+    v_tmp = _make_var(
+        "T",
+        "degC",
+        "Air temperature at 2 m (interpolated)"
+    )
     v_pet = _make_var(
         "PET",
-        "mm 15min-1",
+        "mm [15 min]-1",
         "Penman-Monteith ET0 (15-min, uniform split)",
     )
-    v_dep = _make_var("depth_mm_15min", "mm per 15 min", "MRMS precipitation depth")
 
     print(f"Writing {n_events} events ...")
     for out_i, (ai, mi) in enumerate(zip(aorc_indices, mrms_indices)):
         ns = int(out_n_steps[out_i])
 
-        tmp_row = nc_aorc.variables["TMP_2maboveground"][ai, :ns, :][:, aorc_ci]
+        dep_row = nc_mrms.variables["P"][mi, :ns, :][:, mrms_ci]
+        tmp_row = nc_aorc.variables["T"][ai, :ns, :][:, aorc_ci]
         pet_row = nc_aorc.variables["PET"][ai, :ns, :][:, aorc_ci]
-        dep_row = nc_mrms.variables["depth_mm_15min"][mi, :ns, :][:, mrms_ci]
 
+        v_dep[out_i, :ns, :] = dep_row
         v_tmp[out_i, :ns, :] = tmp_row
         v_pet[out_i, :ns, :] = pet_row
-        v_dep[out_i, :ns, :] = dep_row
 
         if (out_i + 1) % 20 == 0 or out_i == n_events - 1:
             print(f"  {out_i + 1}/{n_events}")
