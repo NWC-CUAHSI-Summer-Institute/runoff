@@ -1,6 +1,6 @@
 > **⚠️ Active Development**: This package is currently under active development.
 
-<h1 align="center">Flash Preprocessor: Data Constructor for ML</h1>
+<h1 align="center">Flash Flood Data Preprocessor: Data Constructor for ML</h1>
 
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9--3.13-blue?labelColor=333333" alt="Python"></a>
