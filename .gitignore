@@ -221,3 +221,4 @@ __marimo__/
 # Other
 *debug*
 event_extraction_inputs/huc8_conus/
+event_extraction/event_extraction_inputs/huc8_conus/
