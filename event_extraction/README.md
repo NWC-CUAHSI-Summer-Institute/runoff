@@ -13,10 +13,10 @@ RUNOFF_interface/
     ├── usgs_events.py                 # Core functions (dependency, not run directly)
     └── event_extraction_inputs/
         ├── gages2_lt1000km2.csv       # USGS gage inventory (STAID, LAT_GAGE, LNG_GAGE), only flash flood scale catchments
-        └── huc8_conus/                # CONUS HUC8 boundary shapefile
+        └── huc8_conus/                # CONUS HUC8 boundary
             └── HUC8_US.shp (+ dependency files)
 ```
-
+huc8_conus could not be included in github, download here: https://www.hydroshare.org/resource/b832a6c2f96541808444ec9562c5247e/
 ---
 
 ## Dependencies
