@@ -147,10 +147,13 @@ def aorc_extract():
 
         if fresh_start:
             f_weights = cache_dir / f'aorc_weights_{vpu}.pkl'
-            f_weights.unlink(missing_ok=True)
+            f_manifest = cache_dir / f'manifest_out_{vpu}.parquet'
+            f_windows = cache_dir / f'event_catchment_windows_{vpu}.parquet'
+            for f in (f_weights, f_manifest, f_windows):
+                f.unlink(missing_ok=True)
             if vpu_dir.exists():
                 shutil.rmtree(vpu_dir)
-            log.info('FRESH_START: cleared weight cache and %s', vpu_dir)
+            log.info('FRESH_START: cleared manifest/weight cache and %s', vpu_dir)
 
         hr_part = vpu_dir / 'aorc_hr_part.nc'
         min15_part = vpu_dir / 'aorc_15min_part.nc'

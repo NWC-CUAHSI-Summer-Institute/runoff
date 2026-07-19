@@ -38,6 +38,7 @@ dependencies = [
     "exactextract",
     "geopandas",
     "h5netcdf",
+    "hydrotools.events",
     "netcdf4",
     "numpy",
     "pandas",
@@ -74,7 +75,7 @@ dev = [
 
 [tool.hatch]
 version.source = "vcs"
-build.hooks.vcs.version-file = "src/flash_preprocess/_version.py"
+build.hooks.vcs.version-file = "src/runoff/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/runoff"]

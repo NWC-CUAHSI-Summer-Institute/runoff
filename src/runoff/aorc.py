@@ -612,7 +612,7 @@ def extract_all(
     out_15min_nc: Path,
     divide_id_of: dict,
     antecedent_days: float = ANTECEDENT_DAYS,
-    max_15min_steps: int = 481,
+    max_15min_steps: int = 577,
 ) -> None:
     """Extract per-event hourly and 15-min AORC forcing to out_hr_nc/out_15min_nc.
 
