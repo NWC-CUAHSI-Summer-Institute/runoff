@@ -1,14 +1,18 @@
 # Per-user local paths for RUNOFF preprocessing.
 
+root: /gpfs/leoglonz/sub_hourly/
+
+# --------------------------------------------- #
+
 # 1. Hydrofabric GeoPackage path.
 #   AWS Download: s3://communityhydrofabric/hydrofabrics/community/conus_nextgen.tar.gz
-hydrofabric_gpkg: /gpfs/leoglonz/sub_hourly/data/conus_nextgen.gpkg
+hydrofabric_gpkg: ${root}/data/conus_nextgen.gpkg
 
 # 2. Flash flood event registry path.
-events_csv: /gpfs/leoglonz/sub_hourly/data/3-huc8/events.csv
+events_csv: ${root}/data/3-huc8/events.csv
 
 # 3. Cache directory for intermediate files.
-cache_dir: /gpfs/leoglonz/sub_hourly/data/3-huc8/cache
+cache_dir: ${root}/data/3-huc8/cache
 
 # 4. USGS discharge download window.
 study_start: '2020-01-01'
@@ -16,13 +20,13 @@ study_end: '2025-12-31'
 
 # 5. CONUS HUC8 watershed boundaries, used by engine/events to find gages
 #    inside a HUC8 of interest.
-huc8_shp: /gpfs/leoglonz/sub_hourly/data/3-huc8_top15_old/shape/HUC8_US.shp
+huc8_shp: ${root}/data/3-huc8_top15_old/shape/HUC8_US.shp
 
 # 6. USGS gage inventory (STAID, LAT_GAGE, LNG_GAGE), used by engine/events
 #    for the HUC8 gage spatial join.
-gages_csv: /gpfs/leoglonz/sub_hourly/runoff/data/gages2_1000km2.csv
+gages_csv: ${root}/data/gages2_1000km2.csv
 
 # 7. Output directory for engine/events' per-HUC8 event extraction. Kept
 #    separate from events_csv, which may already carry columns added by
 #    later pipeline stages (gage_cat-id, vpuid, ...).
-event_output_dir: /gpfs/leoglonz/sub_hourly/data/3-huc8/event_extraction
+event_output_dir: ${root}/data/3-huc8/event_extraction
