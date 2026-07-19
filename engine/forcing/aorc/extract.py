@@ -75,8 +75,8 @@ EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
 CACHE_DIR = CACHE_DIR or _DEFAULT_CACHE_DIR
 
 # Output NetCDF paths for 1) merged hourly and 2) 15-min AORC forcing.
-OUT_HR_NC = CACHE_DIR / 'aorc_hr.nc'
-OUT_15MIN_NC = CACHE_DIR / 'aorc_15min.nc'
+OUT_HR_NC = CACHE_DIR.parent / 'aorc_hr.nc'
+OUT_15MIN_NC = CACHE_DIR.parent / 'aorc_15min.nc'
 
 
 def parse_args():
