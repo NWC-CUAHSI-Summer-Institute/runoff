@@ -28,7 +28,7 @@ from runoff.aorc import (
     merge_hr_parts,
     merge_15min_parts,
 )
-from runoff import CACHE_DIR, EVENTS_CSV
+from runoff import CACHE_DIR as _DEFAULT_CACHE_DIR, EVENTS_CSV as _DEFAULT_EVENTS_CSV
 
 log = logging.getLogger('aorc-extract')
 
@@ -48,10 +48,6 @@ VPU_SUBSET = None
 # Where to cache per-VPU AORC windows, weights, and NetCDF shards.
 #   None = default path set in runoff config.
 CACHE_DIR = None
-
-# Output NetCDF paths for 1) merged hourly and 2) 15-min AORC forcing.
-OUT_HR_NC = CACHE_DIR / 'aorc_hr.nc'
-OUT_15MIN_NC = CACHE_DIR / 'aorc_15min.nc'
 
 # More workers == faster. Make sure you have enough CPUs (=workers) and RAM.
 MAX_WORKERS = 32
@@ -73,6 +69,14 @@ ANTECEDENT_DAYS = 30.0
 #   Needed after any change to WINDOW_DAYS/CENTROID/ANTECEDENT_DAYS.
 FRESH_START = False
 # -------------------------- #
+
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+CACHE_DIR = CACHE_DIR or _DEFAULT_CACHE_DIR
+
+# Output NetCDF paths for 1) merged hourly and 2) 15-min AORC forcing.
+OUT_HR_NC = CACHE_DIR / 'aorc_hr.nc'
+OUT_15MIN_NC = CACHE_DIR / 'aorc_15min.nc'
 
 
 def parse_args():

@@ -27,7 +27,7 @@ from runoff.mrms import (
     extract_all,
     merge_parts,
 )
-from runoff import CACHE_DIR, EVENTS_CSV
+from runoff import CACHE_DIR as _DEFAULT_CACHE_DIR, EVENTS_CSV as _DEFAULT_EVENTS_CSV
 
 log = logging.getLogger('mrms-extract')
 
@@ -52,9 +52,6 @@ TAG_SUFFIX = ''
 #   None = default path set in runoff config.
 CACHE_DIR = None
 
-# Output NetCDF path for merged 15-min MRMS precipitation.
-OUT_NC = CACHE_DIR / 'mrms_15min.nc'
-
 # Margin (degrees) added around each VPU's bbox before downloading.
 BBOX_MARGIN_DEG = 0.1
 
@@ -76,6 +73,12 @@ CENTROID = 'peak'
 #   expensive to rebuild). Needed after any change to WINDOW_DAYS/CENTROID.
 FRESH_START = False
 # -------------------------- #
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+CACHE_DIR = CACHE_DIR or _DEFAULT_CACHE_DIR
+
+# Output NetCDF path for merged 15-min MRMS precipitation.
+OUT_NC = CACHE_DIR / 'mrms_15min.nc'
 
 
 def parse_args():
