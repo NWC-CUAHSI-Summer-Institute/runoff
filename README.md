@@ -1,6 +1,6 @@
 > **⚠️ Active Development**: This package is currently under active development.
 
-<h1 align="center">Flash Flood Data Preprocessor: Data Constructor for ML</h1>
+<h1 align="center">RUNOFF: Flash Flood Event Dataset</h1>
 
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9--3.13-blue?labelColor=333333" alt="Python"></a>
@@ -9,47 +9,79 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow?labelColor=333333" alt="License"></a>
 </p>
 
-This repository serves as a library of data aggregation and preprocessing scripts for
+Data aggregation and preprocessing scripts for the RUNOFF flash flood benchmarking dataset:
 
-1. Defining and aggregating NOAA-recognized **flash flood events** across the Contiguous United States (CONUS), and geolocating these to catchments defined by the NextGen HydroFabric (Community; v2.2);
-
-2. Downloading and aggregating Multi-Radar Multi-Sensor (MRMS) **precipitation measurements** at sub-hourly resolution (2, 15 min);
-
-3. Downloading and aggregation Analysis of Record for Calibration (AORC) **forcing measurements** (precipitation, temperature, solar radiation lw/sw, humidity, pressure, and wind velocity u/v) at hourly resolution;
-
-4. **USGS streamflow gauge observations**.
+1. NOAA-recognized **flash flood events** from USGS streamflow gauges, geolocated to NextGen HydroFabric (Community; v2.2) catchments;
+2. **MRMS** precipitation at sub-hourly (2, 15 min) resolution;
+3. **AORC** forcing (precip, temp, radiation, humidity, pressure, wind u/v) at hourly resolution;
+4. **USGS streamflow** gauge observations.
 
 </br>
 
-## dMG Preprocess Steps:
+## Installation
 
-1. Hydrofabric extraction:
+```bash
+uv pip install -e .
+```
 
-    ```bash
-    # Download Community HydroFabric v2.2
-    aws s3 cp s3://communityhydrofabric/hydrofabrics/community/conus_nextgen.gpkg . --no-sign-request
+Then update `config.yaml` at the repo root (gitignored) with your local paths: `hydrofabric_gpkg`, `events_csv`, `cache_dir`, `study_start`/`study_end`, `huc8_shp`, `gages_csv`, `event_output_dir`. See `src/runoff/paths.py` for how these load.
 
-    # Or
-    aws s3 cp s3://communityhydrofabric/hydrofabrics/community/conus_nextgen.tar.gz . --no-sign-request
+Every `engine/` script has a **CONFIG block** at the top (editable directly) plus matching CLI flags -- run any script with `--help`. `None` in a CONFIG block generally means "use the `config.yaml` default."
 
-    python ./engine/geo/extract_hf.py --csv  --gpkg ~/.ngiab/hydrofabric/v2.2/conus_nextgen.gpkg --output-dir data/upper_neuse/
-    ```
+</br>
 
-2. AORC extraction:
+## Pipeline
 
-    ```bash
-    # Get index
-    python engine/forcing/aorc/index_hf_weighted.py --csv /Users/leoglonz/Desktop/noaa/data/upper_neuse/events.csv --upstream --output data/upper_neuse/weighted_index_dict.pkl
+Run in order (see `engine/README.md`, `engine/geo/README.md`, `engine/events/README.md` for details):
 
-    # Get AORC
-    python engine/forcing/aorc/extract.py --start 2021-01-01 --end 2025-12-31 --index data/upper_neuse/weighted_index_dict.pkl --output-dir data/upper_neuse
+```bash
+# 1. USGS hydrographs -> flash flood events
+python engine/events/extract.py --huc8 03020201 --wy-start 2021 --wy-end 2025
 
-    # Extract to hourly and 15min event datasets
-    python engine/forcing/aorc/to_events.py --events /Users/leoglonz/Desktop/noaa/data/upper_neuse/events.csv --forcing /Users/leoglonz/Desktop/noaa/data/upper_neuse/aorc_extracted.nc --output-dir /Users/leoglonz/Desktop/noaa/data/upper_neuse
-    ```
+# 2. Subset hydrofabric to event catchments + upstream network
+python engine/geo/extract_hf.py --csv events.csv --gpkg conus_nextgen.gpkg --output-dir data/upper_neuse/
 
-3. Combine AORC + MRMS
+# 3. Snap gages to catchments (adds gage_cat-id, needed by steps 4-5)
+python engine/geo/_gage_to_cat.py --csv events.csv --gpkg conus_nextgen.gpkg
 
-    ```bash
-    python engine/forcing/merge_15min.py --aorc /gpfs/leoglonz/suijin/flash-preprocess/data/aorc_15min.nc --mrms /gpfs/leoglonz/suijin/flash-preprocess/data/mrms_15min.nc  --output /gpfs/leoglonz/suijin/flash-preprocess/data/forcing_15min.nc
-    ```
+# 4. MRMS precip (optional sharding for large events CSVs, then merge parts)
+python engine/forcing/mrms/sharding.py --events-csv events.csv --n-shards 8
+python engine/forcing/mrms/extract.py --events-csv events.csv --window-days 6 --centroid peak
+python engine/forcing/mrms/merge.py
+
+# 5. AORC forcing (--window-days/--centroid must match step 4)
+python engine/forcing/aorc/extract.py --events-csv events.csv --window-days 6 --centroid peak --antecedent-days 30
+
+# 6. Merge AORC + MRMS into one 15-min forcing NetCDF
+python engine/forcing/merge_15min.py --aorc data/aorc_15min.nc --aorc-hr data/aorc_hr.nc --mrms data/mrms_15min.nc --output data/forcing_15min.nc
+
+# 7. USGS streamflow (parallel to 4-6), aligned to the merged forcing's event windows
+python engine/streamflow/usgs/extract.py --events events.csv --start 2020-01-01 --end 2025-12-31
+python engine/streamflow/usgs/to_events.py --forcing data/forcing_15min.nc --csv data/usgs_discharge.csv --output data/streamflow.nc
+```
+
+</br>
+
+## Architecture
+
+```text
+src/runoff/     # Installable library (paths.py, aorc.py, mrms.py, pet.py, utils.py)
+engine/
+├── events/      # USGS hydrograph -> flash flood event detection
+├── geo/         # Hydrofabric subsetting + gage-to-catchment mapping
+├── forcing/
+│   ├── aorc/    # AORC extraction
+│   ├── mrms/    # MRMS extraction + sharding/merge
+│   └── merge_15min.py
+└── streamflow/usgs/  # USGS discharge download + event-NetCDF conversion
+```
+
+</br>
+
+<!-- ## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](https://github.com/mhpi/generic_deltamodel/blob/master/docs/CONTRIBUTING.md) for details. -->
+
+---
+
+*Please submit an [issue](https://github.com/mhpi/generic_deltamodel/issues) to report any questions, concerns, bugs, etc.*
