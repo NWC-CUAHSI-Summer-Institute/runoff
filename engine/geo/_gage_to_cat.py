@@ -15,7 +15,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from runoff import EVENTS_CSV, HYDROFABRIC_GPKG
+from runoff import EVENTS_CSV as _DEFAULT_EVENTS_CSV, HYDROFABRIC_GPKG
 
 log = logging.getLogger('gage-to-cat')
 
@@ -29,8 +29,12 @@ LAT_COL = 'gage_lat'
 LON_COL = 'gage_lon'
 
 # Output CSV path (CSV_PATH plus a gage_cat-id column).
-OUTPUT_CSV = EVENTS_CSV.parent / 'events_with_cat_id.csv'
+#   None -- defaults to EVENTS_CSV's own directory.
+OUTPUT_CSV = None
 # -------------------------- #
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+OUTPUT_CSV = OUTPUT_CSV or (EVENTS_CSV.parent / 'events_with_cat_id.csv')
 
 
 def read_hydrofabric(hydrofabric_gpkg: str) -> tuple[pd.DataFrame, gpd.GeoDataFrame]:

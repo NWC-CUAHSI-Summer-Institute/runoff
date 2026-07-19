@@ -22,7 +22,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from runoff import CACHE_DIR, EVENTS_CSV, HYDROFABRIC_GPKG
+from runoff import CACHE_DIR, EVENTS_CSV as _DEFAULT_EVENTS_CSV, HYDROFABRIC_GPKG
 from runoff.utils import build_upstream_graph, expand_upstream
 
 log = logging.getLogger('hf-extract')
@@ -45,6 +45,8 @@ OUTPUT_DIR = CACHE_DIR.parent
 # False -- only keep the seed divide IDs, no upstream expansion.
 UPSTREAM = True
 # -------------------------- #
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
 
 
 def _cat_to_int(cat_id: str) -> int:

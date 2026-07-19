@@ -17,7 +17,11 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from runoff import EVENTS_CSV, STUDY_START, STUDY_END
+from runoff import (
+    EVENTS_CSV as _DEFAULT_EVENTS_CSV,
+    STUDY_START as _DEFAULT_STUDY_START,
+    STUDY_END as _DEFAULT_STUDY_END,
+)
 
 log = logging.getLogger('usgs-extract')
 
@@ -42,11 +46,17 @@ PARAMETER_CODE = '00060'
 RAW_CACHE = None
 
 # Output CSV path.
-OUTPUT_CSV = EVENTS_CSV.parent / 'usgs_discharge.csv'
+#   None -- defaults to EVENTS_CSV's own directory.
+OUTPUT_CSV = None
 
 # NWIS Instantaneous Values service URL for USGS.
 _NWIS_URL = 'https://waterservices.usgs.gov/nwis/iv/'
 # -------------------------- #
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+STUDY_START = STUDY_START or _DEFAULT_STUDY_START
+STUDY_END = STUDY_END or _DEFAULT_STUDY_END
+OUTPUT_CSV = OUTPUT_CSV or (EVENTS_CSV.parent / 'usgs_discharge.csv')
 
 
 def load_gage_ids(events_csv: Path, staid_col: str) -> list[str]:

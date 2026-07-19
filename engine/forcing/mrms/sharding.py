@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from runoff import EVENTS_CSV
+from runoff import EVENTS_CSV as _DEFAULT_EVENTS_CSV
 
 log = logging.getLogger('mrms-shard')
 
@@ -28,8 +28,11 @@ N_SHARDS = 8
 
 # Output directory for the shard CSVs.
 #   None -- defaults to EVENTS_CSV's own directory.
-OUT_DIR = EVENTS_CSV.parent / 'cache' / 'event_shards'
+OUT_DIR = None
 # -------------------------- #
+
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+OUT_DIR = OUT_DIR or (EVENTS_CSV.parent / 'cache' / 'event_shards')
 
 
 def parse_args():
