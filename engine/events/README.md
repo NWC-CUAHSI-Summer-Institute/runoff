@@ -1,77 +1,44 @@
-# RUNOFF_interface
+# engine/events
 
-A Python pipeline for extracting and characterizing flood events from USGS streamflow records. Given one or more HUC8 watershed IDs, it finds all gages inside those watersheds, downloads 15-minute discharge data via the USGS NWIS API, separates hydrographs into individual flood events, and writes per-site and combined CSV outputs.
+A pipeline for extracting and characterizing flood events from USGS streamflow records. Given one or more HUC8 watershed IDs, it finds all gages inside those watersheds, downloads 15-minute discharge data via the USGS NWIS API, separates hydrographs into individual flood events, and writes per-site and combined CSV outputs.
 
 ---
 
 ## Package Structure
 
+Library logic lives in `src/runoff/events.py` (event detection, metrics) and `src/runoff/usgs.py` (NWIS discharge download, shared with `engine/streamflow/usgs/extract.py`). This directory holds only the thin CLI entry point:
+
 ```
-RUNOFF_interface/
-└── event_separation/
-    ├── event_extraction_pipeline.py   # Main script — configure and run this
-    ├── usgs_events.py                 # Core functions (dependency, not run directly)
-    └── event_extraction_inputs/
-        ├── gages2_lt1000km2.csv       # USGS gage inventory (STAID, LAT_GAGE, LNG_GAGE), only flash flood scale catchments
-        └── huc8_conus/                # CONUS HUC8 boundary
-            └── HUC8_US.shp (+ dependency files)
-```
-huc8_conus could not be included in github, download here: https://www.hydroshare.org/resource/b832a6c2f96541808444ec9562c5247e/
----
-
-## Dependencies
-
-Install with pip:
-
-```bash
-pip install numpy pandas geopandas dataretrieval hydrotools.events
+engine/events/
+└── extract.py   # Main script -- edit the CONFIG block and run this
 ```
 
-| Package | Purpose |
-|---|---|
-| `numpy`, `pandas` | Data handling |
-| `geopandas` | Spatial join to find gages inside HUC8 polygons |
-| `dataretrieval` | USGS NWIS API client |
-| `hydrotools.events` | Hydrograph event detection (NOAA-OWP) |
+Inputs (see `config.yaml`):
+- `gages_csv` -- USGS gage inventory (STAID, LAT_GAGE, LNG_GAGE), flash-flood-scale catchments only.
+- `huc8_shp` -- CONUS HUC8 boundary shapefile. Not tracked in git; download from https://www.hydroshare.org/resource/b832a6c2f96541808444ec9562c5247e/
 
 ---
 
 ## Quick Start
 
-1. Open `event_extraction_pipeline.py` and edit the **USER SETTINGS** block near the top:
+1. Edit the **CONFIG** block at the top of `extract.py` (or override any of it via CLI flags -- run `python extract.py --help`):
 
 ```python
-# Water years to retrieve
-# All timestamps and outputs in UTC
+HUC8_LIST = ['03020201']       # one or more 8-digit HUC8 IDs
 WY_START = 2021
-WY_END   = 2025
-
-# Output folder and combined filename
-OUTDIR       = "/your/output/folder"
-COMBINED_OUT = "combined_events.csv"
-
-# One or more 8-digit HUC8 IDs
-HUC8_LIST = ["03020201"]
-
-# Paths to the bundled input files
-HUC8_SHP  = ".../RUNOFF_interface/event_separation/event_extraction_inputs/huc8_conus/HUC8_US.shp"
-GAGES_CSV = ".../RUNOFF_interface/event_separation/event_extraction_inputs/gages2_lt1000km2.csv"
-
-# Flow threshold: keep only events with peak >= Q at this exceedance probability
-# 50 = Q50 (median flow) — less selective, captures more events
-# 25 = Q25 (exceeded only 25% of the time) — stricter, larger events only
-Q_EXCEEDANCE_PCT = 25
+WY_END = 2025
+Q_EXCEEDANCE_PCT = 25          # keep only events with peak >= Q at this exceedance probability
 ```
 
 2. Run the script:
 
 ```bash
-python event_extraction_pipeline.py
+python engine/events/extract.py
 ```
 
-3. Outputs are written to `OUTDIR`:
-   - `stations_huc8_<ID>.csv` — list of gages found inside the HUC8
-   - `huc8_<ID>_combined_events.csv` — all events across all sites in that HUC8
+3. Outputs are written to `event_output_dir` (see `config.yaml`):
+   - `stations_huc8_<ID>.csv` -- list of gages found inside the HUC8
+   - `huc8_<ID>_combined_events.csv` -- all events across all sites in that HUC8
 
 ---
 
@@ -106,20 +73,18 @@ For each HUC8 in `HUC8_LIST`, the pipeline runs these steps:
 
 ## Tuning Event Detection
 
-The detection parameters in the USER SETTINGS block control how the hydrograph is split into events. The defaults are tuned for flashy, small-basin responses:
+The `DETECT_KWARGS` in the CONFIG block control how the hydrograph is split into events. The defaults are tuned for flashy, small-basin responses:
 
 ```python
-DETECT_KWARGS = dict(
-    halflife="1h",              
-    window="2D",                
-    minimum_event_duration="1h",
-    start_radius="2h",          
-)
+DETECT_KWARGS = {
+    'halflife': '1h',
+    'window': '2D',
+    'minimum_event_duration': '1h',
+    'start_radius': '2h',
+}
 ```
 
-Source for information on these parameters: https://github.com/NWC-CUAHSI-Summer-Institute/flash_preprocess
-For slower, larger watersheds you may want to increase `halflife` (e.g. `"6h"`) and `window` (e.g. `"7D"`).
+For slower, larger watersheds you may want to increase `halflife` (e.g. `'6h'`) and `window` (e.g. `'7D'`).
 
 ---
-
 

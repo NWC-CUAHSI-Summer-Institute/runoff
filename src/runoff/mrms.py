@@ -1205,7 +1205,7 @@ def extract_all(
     frac_cw: pd.DataFrame,
     shard_dir: Path,
     out_nc: Path,
-    max_steps: int = 481,
+    max_steps: int = 577,
     zero_precip_threshold_mm: float = 1.0,
 ) -> None:
     """Extract per-event 15-min MRMS catchment precipitation to out_nc."""
