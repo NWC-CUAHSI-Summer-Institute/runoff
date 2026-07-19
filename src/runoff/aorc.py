@@ -483,7 +483,7 @@ def _write_records_csr(
     """Write per-event records to out_nc in ragged (CSR) form.
 
     Each record already carries only its own local upstream catchments-- entries
-    are laid out per event via cat_ptr, written one event at a time so no array 
+    are laid out per event via cat_ptr, written one event at a time so no array
     spanning all events/catchments is ever held in memory.
     """
     n_ev = len(records)
@@ -498,10 +498,12 @@ def _write_records_csr(
     nc.createDimension('time_step', max_steps)
 
     nc.createVariable('event_id', str, ('event',))[:] = np.array(
-        [r['event_id'] for r in records], dtype=object,
+        [r['event_id'] for r in records],
+        dtype=object,
     )
     nc.createVariable('n_steps', 'i4', ('event',))[:] = np.array(
-        [r['n_steps'] for r in records], dtype=np.int32,
+        [r['n_steps'] for r in records],
+        dtype=np.int32,
     )
     v_ts = nc.createVariable('ts_start', 'f8', ('event',))
     v_ts.units = 'minutes since 1970-01-01 00:00:00 UTC'
@@ -510,10 +512,12 @@ def _write_records_csr(
     v_te.units = 'minutes since 1970-01-01 00:00:00 UTC'
     v_te[:] = [_mins(r['ts_end']) for r in records]
     nc.createVariable('event_gage_id', str, ('event',))[:] = np.array(
-        [r['gage_id'] for r in records], dtype=object,
+        [r['gage_id'] for r in records],
+        dtype=object,
     )
     nc.createVariable('event_divide_id', str, ('event',))[:] = np.array(
-        [r['divide_id'] for r in records], dtype=object,
+        [r['divide_id'] for r in records],
+        dtype=object,
     )
 
     cat_ptr = np.zeros(n_ev + 1, dtype=np.int64)
@@ -559,7 +563,8 @@ def _write_records_csr(
 
 
 def _catchment_metadata(
-    ds: xr.Dataset, weight_idx: dict,
+    ds: xr.Dataset,
+    weight_idx: dict,
 ) -> tuple[csr_matrix, np.ndarray, np.ndarray]:
     """Localize global pixel_ids to ds's pixel-dim ordering, build the sparse
     weight matrix, and compute area-weighted catchment centroids.
@@ -787,10 +792,11 @@ def extract_all(
 
 
 def _merge_event_parts(
-    part_paths: Iterable[Path], out_nc: Path, data_vars: dict,
+    part_paths: Iterable[Path],
+    out_nc: Path,
+    data_vars: dict,
 ) -> None:
-    """Concatenate ragged (CSR) per-event AORC part files into out_nc.
-    """
+    """Concatenate ragged (CSR) per-event AORC part files into out_nc."""
     part_paths = list(part_paths)
     ncs = [netCDF4.Dataset(p, 'r') for p in part_paths]
 

@@ -127,7 +127,11 @@ def load_hydrofabric(
         layer='divides',
         columns=['divide_id', 'id', 'toid', 'areasqkm'],
     )
-    flowpaths = gpd.read_file(HYDROFABRIC_GPKG, layer='flowpaths', columns=['id', 'toid'])
+    flowpaths = gpd.read_file(
+        HYDROFABRIC_GPKG,
+        layer='flowpaths',
+        columns=['id', 'toid'],
+    )
     nexus = gpd.read_file(HYDROFABRIC_GPKG, layer='nexus', columns=['id', 'toid'])
 
     net_lookup = network.dropna(subset=['divide_id']).drop_duplicates('divide_id')[
@@ -233,8 +237,12 @@ def build_crosswalk(
     """Build (or load cached) MRMS cell-to-catchment crosswalk."""
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    target_vpus = sorted(vpus) if vpus is not None else sorted(
-        catchments_master['vpuid'].dropna().unique(),
+    target_vpus = (
+        sorted(vpus)
+        if vpus is not None
+        else sorted(
+            catchments_master['vpuid'].dropna().unique(),
+        )
     )
     parts = []
     t0 = time.time()
@@ -429,7 +437,11 @@ def _mrms_cell_polys(rows: np.ndarray, cols: np.ndarray) -> gpd.GeoDataFrame:
 
 
 def _rows_cols_for_bbox(
-    west: float, south: float, east: float, north: float, pad: int = 2,
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    pad: int = 2,
 ) -> pd.DataFrame:
     """All MRMS grid (row, col) pairs covering a bbox, padded by `pad` cells."""
     i0 = max(0, int(np.floor((west - MRMS_LON_MIN_EDGE - HALF) / MRMS_RES)) - pad)
@@ -467,7 +479,10 @@ def _add_neighbors(df: pd.DataFrame, pad: int = 2) -> pd.DataFrame:
     return out.drop_duplicates().reset_index(drop=True)
 
 
-def _intersection_area(candidates: gpd.GeoDataFrame, chunk: int = 150_000) -> np.ndarray:
+def _intersection_area(
+    candidates: gpd.GeoDataFrame,
+    chunk: int = 150_000,
+) -> np.ndarray:
     """Cell/catchment intersection area (m^2) per row, chunked to bound peak memory."""
     areas = []
     for s in range(0, len(candidates), chunk):
@@ -613,7 +628,11 @@ def _paths(ts: pd.Timestamp) -> tuple[str, str]:
     return aws, isu
 
 
-def _fetch_bytes(ts: pd.Timestamp, fs: Any | None, session: requests.Session | None = None) -> Any:
+def _fetch_bytes(
+    ts: pd.Timestamp,
+    fs: Any | None,
+    session: requests.Session | None = None,
+) -> Any:
     """Fetch one timestamp's raw gzipped GRIB2 bytes: AWS first, then Iowa
     State. Returns None on transient failure, or _CONFIRMED_MISSING if both
     sources report the file doesn't exist.
@@ -724,7 +743,8 @@ def _decode_precip(raw_gz: bytes) -> xr.DataArray:
 
 
 def _subset_bbox(
-    da: xr.DataArray, bbox: tuple[float, float, float, float],
+    da: xr.DataArray,
+    bbox: tuple[float, float, float, float],
 ) -> xr.DataArray:
     """Slice a decoded grid to (lon_min, lat_min, lon_max, lat_max), handling
     both ascending/descending coordinate order and 0-360 longitude grids.
@@ -802,7 +822,9 @@ def _read_existing_times(path: str) -> set:
 
 
 def _write_day(
-    path: str, existing_da: xr.DataArray | None, new_slices: list[xr.DataArray],
+    path: str,
+    existing_da: xr.DataArray | None,
+    new_slices: list[xr.DataArray],
 ) -> int:
     """Merge existing + newly-fetched slices for one day and write the shard file.
 
@@ -1223,21 +1245,24 @@ def extract_all(
     # several of the underlying day-files) and the memory blowup of loading
     # the *entire* (often much larger) bounding-box grid at every timestamp,
     # most of which no single event ever touches.
-    uniq_cells = (
-        frac_cw.drop_duplicates('cell_id')[['cell_id', 'lat', 'lon_360']]
-        .reset_index(drop=True)
-    )
+    uniq_cells = frac_cw.drop_duplicates('cell_id')[
+        ['cell_id', 'lat', 'lon_360']
+    ].reset_index(drop=True)
     cell_col = {cid: i for i, cid in enumerate(uniq_cells['cell_id'])}
     log.info(
         'pre-loading %d unique MRMS cell(s) referenced by this VPU-shard '
         '(of a larger bounding-box grid) across the full time range...',
         len(uniq_cells),
     )
-    pts = ds['precip_rate'].sel(
-        latitude=xr.DataArray(uniq_cells['lat'].values, dims='cell'),
-        longitude=xr.DataArray(uniq_cells['lon_360'].values, dims='cell'),
-        method='nearest',
-    ).load()
+    pts = (
+        ds['precip_rate']
+        .sel(
+            latitude=xr.DataArray(uniq_cells['lat'].values, dims='cell'),
+            longitude=xr.DataArray(uniq_cells['lon_360'].values, dims='cell'),
+            method='nearest',
+        )
+        .load()
+    )
     times_all = pd.DatetimeIndex(pts['time'].values)
     pts_all = pts.values  # (time, cell)
     ds.close()

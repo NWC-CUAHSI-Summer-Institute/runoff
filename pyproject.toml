@@ -40,7 +40,7 @@ dependencies = [
     "h5netcdf",
     "hydrotools.events",
     "netcdf4",
-    "numpy",
+    "numpy<2.5",
     "pandas",
     "pyarrow",
     "pyyaml",
