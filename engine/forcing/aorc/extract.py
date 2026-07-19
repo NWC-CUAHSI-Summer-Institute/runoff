@@ -1,416 +1,222 @@
-r"""Extract AORC forcing data for a set of NextGen catchments.
+"""Extract hourly AORC (Analysis Of Record for Calibration) forcing for a set
+of flash flood events.
 
-Reads the NOAA AORC v1.1 1km zarr from S3 (hourly, 1979-2025), spatially
-averages each variable over catchment pixels, and optionally disaggregates
-to 15-minute intervals.
+Outputs:
+    - 15-min resolution forcing NetCDF for all events (window centered on
+      each event's centroid or peak flow time)
+    - 1-hr resolution forcing NetCDF for all events (antecedent days
+      preceding the 15-min window)
 
-Time range is set via --start / --end (ISO 8601 dates or datetimes), or
---year YYYY as a shorthand for a full calendar year. One yearly zarr is
-opened per calendar year spanned and sliced to the exact range.
+Edit the CONFIG block at the top of this file to set all options, or
+override per-invocation via CLI flags (see below).
 
-Disaggregation (--timestep 15min):
-  APCP_surface (accumulated precip): uniform split — each hourly value
-    divided by 4 and repeated, conserving the total accumulation.
-  All other variables (instantaneous): linearly interpolated between
-    hourly values, with the last value held for trailing sub-hour steps.
-
-Index format (auto-detected):
-  Equal-weight, built by index_hf.py
-  Area-weighted, built by index_hf_weighted.py (more accurate at boundaries)
-
-Output
-------
-  <output-dir>/forcing.nc  single NetCDF, shape (catchment, time) per variable
-    Row i corresponds to station_ids[i] from the index pkl.
-
-Usage
------
-    # Full year, hourly
-    python engine/forcing/aorc/extract.py --year 2022 --index /path/to/index.pkl
-
-    # Arbitrary range, 15-minute output
-    python engine/forcing/aorc/extract.py \\
-        --start 2019-10-01 --end 2022-09-30T23:00 \\
-        --timestep 15min \\
-        --index /path/to/index.pkl --output-dir /path/to/output/
+@drworm
 """
 
-import os
-import time
 import argparse
-import pickle
-from datetime import datetime, timedelta
+import logging
+import shutil
+from pathlib import Path
 
-import netCDF4
-import numpy as np
+import pandas as pd
 
-from flash_preprocess.aorc import (
-    VARIABLE_LIST,
-    open_aorc,
-    spatial_subset_weighted,
-    spatial_subset_equal,
-    build_weight_matrix,
-    weighted_mean,
-    groupby_mean_equal,
-    disaggregate_to_15min,
+from runoff.mrms import load_hydrofabric, build_manifest
+from runoff.aorc import (
+    build_weighted_crosswalk,
+    build_shards,
+    extract_all,
+    merge_hr_parts,
+    merge_15min_parts,
 )
-from flash_preprocess.utils import (
-    build_upstream_graph,
-    expand_upstream,
-    HF_PATH_DEFAULT,
-)
+from runoff import CACHE_DIR as _DEFAULT_CACHE_DIR, EVENTS_CSV as _DEFAULT_EVENTS_CSV
+
+log = logging.getLogger('aorc-extract')
 
 
-def round_to_nearest_15min(dt_str: str) -> np.datetime64:
-    """Parse an ISO 8601 datetime string and round to nearest 15min (half-up).
+# CONFIG -------------------------- #
+# Flash flood event registry.
+#   None = default path set in runoff config.
+EVENTS_CSV = None
+#   None = all events in EVENTS_CSV; else e.g. [1266, 4703]
+EVENT_IDS = None
 
-    Parameters
-    ----------
-    dt_str
-        ISO 8601 datetime string, e.g. '2021-10-09T 13:37:30'.
+# VPUs to process in this runtime.
+#   None = every VPU in EVENTS_CSV; else e.g. ['01', '03N']
+#   Merge with forcing/mrms/merge.py
+VPU_SUBSET = None
 
-    Returns
-    -------
-    np.datetime64
-        Rounded datetime64[m].
-    """
-    for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M', '%Y-%m-%d'):
-        try:
-            dt = datetime.strptime(dt_str, fmt)
-            break
-        except ValueError:
-            continue
-    else:
-        raise ValueError(f"Cannot parse datetime: {dt_str!r}")
-    total_minutes = dt.hour * 60 + dt.minute + dt.second / 60
-    rounded = int(total_minutes / 15 + 0.5) * 15
-    dt_r = dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
-        minutes=rounded,
-    )
-    return np.datetime64(dt_r, 'm')
+# Where to cache per-VPU AORC windows, weights, and NetCDF shards.
+#   None = default path set in runoff config.
+CACHE_DIR = None
 
+# More workers == faster. Make sure you have enough CPUs (=workers) and RAM.
+MAX_WORKERS = 32
 
-def parse_window(window_str: str) -> int:
-    """Parse window string into total minutes. Accepts '5d', '120h', '7200min'.
+# Total width of each event's forcing window (days), centered on event.
+#    Must match WINDOW_DAYS used for MRMS run.
+WINDOW_DAYS = 6.0
 
-    Parameters
-    ----------
-    window_str
-        String specifying a duration in days, hours, or minutes.
+# Event window centroid method.
+#   'midpoint' -- center between begin and end times.
+#   'peak' (Recommended) -- window centered on the event's reported peak time.
+CENTROID = 'peak'
 
-    Returns
-    -------
-    int
-        Total duration in minutes.
-    """
-    if window_str.endswith('d'):
-        return int(window_str[:-1]) * 24 * 60
-    elif window_str.endswith('h'):
-        return int(window_str[:-1]) * 60
-    elif window_str.endswith('min'):
-        return int(window_str[:-3])
-    raise ValueError(
-        f"Unrecognised window format {window_str!r}. Use e.g. '5d', '120h', '7200min'.",
-    )
+# Hourly warmup window (days) preceding each event's WINDOW_DAYS window.
+ANTECEDENT_DAYS = 30.0
+
+# Caching
+#   True -- ignore cached per-VPU windows/weights/shards and rebuild.
+#   Needed after any change to WINDOW_DAYS/CENTROID/ANTECEDENT_DAYS.
+FRESH_START = False
+# -------------------------- #
 
 
-def main():
-    """Parse CLI args and run the AORC extraction."""
-    parser = argparse.ArgumentParser(
-        description="Extract AORC forcing data to catchments.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
+EVENTS_CSV = EVENTS_CSV or _DEFAULT_EVENTS_CSV
+CACHE_DIR = CACHE_DIR or _DEFAULT_CACHE_DIR
 
-    # Arg parse
-    time_grp = parser.add_mutually_exclusive_group(required=True)
-    time_grp.add_argument('--year', type=int, help="Full calendar year (e.g. 2022)")
-    time_grp.add_argument(
-        '--start',
-        metavar='DATETIME',
-        help="Start of range, ISO 8601. Pair with --end.",
-    )
-    time_grp.add_argument(
-        '--center',
-        metavar='DATETIME',
-        help="Centre of a symmetric time window (ISO 8601, e.g. "
-        "'2021-10-09T13:37:30'). Rounded to nearest 15 min "
-        "when --timestep 15min. Pair with --window.",
-    )
+# Output NetCDF paths for 1) merged hourly and 2) 15-min AORC forcing.
+OUT_HR_NC = CACHE_DIR / 'aorc_hr.nc'
+OUT_15MIN_NC = CACHE_DIR / 'aorc_15min.nc'
 
-    parser.add_argument(
-        '--end',
-        metavar='DATETIME',
+
+def parse_args():
+    """Parse command-line overrides for the CONFIG block above."""
+    p = argparse.ArgumentParser(description='AORC forcing extraction pipeline')
+    p.add_argument('--events-csv', type=Path, default=EVENTS_CSV)
+    p.add_argument(
+        '--vpu-subset',
         default=None,
-        help="End of range, inclusive. Required with --start.",
+        help="Comma-separated VPU codes, e.g. '03N,02'. Unset -> every VPU "
+        'present in --events-csv (the VPU_SUBSET default).',
     )
-    parser.add_argument(
-        '--window',
-        metavar='DURATION',
-        default=None,
-        help="Window size around --center, e.g. '5d', '120h', "
-        "'7200min'. Required with --center.",
+    p.add_argument('--cache-dir', type=Path, default=CACHE_DIR)
+    p.add_argument('--out-hr-nc', type=Path, default=OUT_HR_NC)
+    p.add_argument('--out-15min-nc', type=Path, default=OUT_15MIN_NC)
+    p.add_argument('--max-workers', type=int, default=MAX_WORKERS)
+    p.add_argument('--window-days', type=float, default=WINDOW_DAYS)
+    p.add_argument('--centroid', choices=['midpoint', 'peak'], default=CENTROID)
+    p.add_argument('--antecedent-days', type=float, default=ANTECEDENT_DAYS)
+    p.add_argument('--fresh-start', action='store_true', default=FRESH_START)
+    return p.parse_args()
+
+
+def aorc_extract():
+    """Run the AORC forcing extraction pipeline."""
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
+    args = parse_args()
+    event_path = args.events_csv
+    vpu_subset = args.vpu_subset.split(',') if args.vpu_subset else None
+    cache_dir = args.cache_dir
+    out_hr_nc = args.out_hr_nc
+    out_15min_nc = args.out_15min_nc
+    max_workers = args.max_workers
+    window_days = args.window_days
+    centroid = args.centroid
+    antecedent_days = args.antecedent_days
+    fresh_start = args.fresh_start
+
+    catchments_master, *_ = load_hydrofabric(cache_dir)
+    log.info('hydrofabric: %d catchments', len(catchments_master))
+
+    events = pd.read_csv(event_path, dtype={'STAID': str})
+    if EVENT_IDS is not None:
+        events = events[events['event_id'].isin(EVENT_IDS)]
+
+    cat_vpu = catchments_master.set_index('divide_id')['vpuid']
+    events = events.assign(vpuid=events['gage_cat-id'].map(cat_vpu))
+    vpus = sorted(events['vpuid'].dropna().unique())
+    if vpu_subset is not None:
+        vpus = [v for v in vpus if v in vpu_subset]
+    log.info('events: %d across %d VPU(s): %s', len(events), len(vpus), vpus)
+    log.info(
+        "window: %s day(s) centered on '%s', %sd antecedent",
+        window_days,
+        centroid,
+        antecedent_days,
     )
 
-    # spatial index
-    parser.add_argument(
-        '--index',
-        required=True,
-        help="Index pkl (index_hf22.py or index_hf22_weighted.py)",
-    )
+    # 15-min steps in a window_days-wide window, + a small buffer for the
+    # outward hour-grid rounding in build_manifest.
+    max_15min_steps = int(round(window_days * 24 * 60 / 15)) + 1
 
-    # optional catchment filter
-    parser.add_argument(
-        '--catchment-ids',
-        nargs="+",
-        metavar='ID',
-        default=None,
-        help="Subset of catchment IDs to output. If omitted, all "
-        "catchments in the index are used.",
-    )
-    parser.add_argument(
-        '--upstream',
-        action='store_true',
-        help="Expand --catchment-ids to include all upstream "
-        "catchments (reads hydrofabric network).",
-    )
-    parser.add_argument(
-        '--hydrofabric',
-        default=HF_PATH_DEFAULT,
-        help="Path to conus_nextgen.gpkg, needed for --upstream.",
-    )
+    hr_parts, min15_parts = [], []
+    for vpu in vpus:
+        log.info('=== VPU %s ===', vpu)
+        vpu_events = events[events['vpuid'] == vpu]
+        vpu_dir = cache_dir / 'aorc_runs' / vpu
 
-    # output
-    parser.add_argument('--output-dir', default='.', help="Output directory")
-    parser.add_argument(
-        '--variables',
-        nargs="+",
-        default=VARIABLE_LIST,
-        help="Variables to extract (default: all 8)",
-    )
-    parser.add_argument(
-        '--timestep',
-        choices=['1h', '15min'],
-        default='1h',
-        help="Output timestep: 1h (default) or 15min.",
-    )
-    args = parser.parse_args()
+        if fresh_start:
+            f_weights = cache_dir / f'aorc_weights_{vpu}.pkl'
+            f_manifest = cache_dir / f'manifest_out_{vpu}.parquet'
+            f_windows = cache_dir / f'event_catchment_windows_{vpu}.parquet'
+            for f in (f_weights, f_manifest, f_windows):
+                f.unlink(missing_ok=True)
+            if vpu_dir.exists():
+                shutil.rmtree(vpu_dir)
+            log.info('FRESH_START: cleared manifest/weight cache and %s', vpu_dir)
 
-    if args.start and args.end is None:
-        parser.error("--end is required when --start is used")
-    if args.center and args.window is None:
-        parser.error("--window is required when --center is used")
-    if args.upstream and not args.catchment_ids:
-        parser.error("--upstream requires --catchment-ids")
-
-    do_15min = args.timestep == "15min"
-
-    # resolve time bounds and optional trim window
-    trim_slice: tuple | None = None
-
-    if args.year:
-        start = np.datetime64(f"{args.year}-01-01T00:00", 'h')
-        end = np.datetime64(f"{args.year}-12-31T23:00", 'h')
-
-    elif args.start:
-        start = np.datetime64(args.start, 'h')
-        end = np.datetime64(args.end, 'h')
-
-    else:  # --center / --window
-        window_min = parse_window(args.window)
-        step_min = 15 if do_15min else 60
-        n_window = window_min // step_min
-
-        if do_15min:
-            center = round_to_nearest_15min(args.center)
-            print(f"Center rounded to nearest 15 min: {center}")
-        else:
-            center = np.datetime64(args.center, 'h')
-
-        half = n_window // 2
-        win_start = center - np.timedelta64(int(half * step_min), 'm')
-        win_end = win_start + np.timedelta64(int((n_window - 1) * step_min), 'm')
-        print(f"Window: {win_start} -> {win_end} ({n_window} * {args.timestep})")
-
-        if do_15min:
-            # open one extra hour past the end so interpolation is valid at win_end
-            start = win_start.astype('datetime64[h]')
-            end = win_end.astype('datetime64[h]') + np.timedelta64(1, 'h')
-            i_start = int(
-                (win_start.astype('datetime64[m]') - start.astype('datetime64[m]'))
-                / np.timedelta64(15, 'm'),
+        hr_part = vpu_dir / 'aorc_hr_part.nc'
+        min15_part = vpu_dir / 'aorc_15min_part.nc'
+        if not fresh_start and hr_part.exists() and min15_part.exists():
+            log.info(
+                '%s and %s already exist -- skipping manifest/weights/shards/extract '
+                'for VPU %s (use --fresh-start to force a rebuild).',
+                hr_part,
+                min15_part,
+                vpu,
             )
-            trim_slice = (i_start, i_start + n_window)
-        else:
-            start = win_start.astype('datetime64[h]')
-            end = win_end.astype('datetime64[h]')
+            hr_parts.append(hr_part)
+            min15_parts.append(min15_part)
+            continue
 
-    # load index
-    print(f"Loading index: {args.index}")
-    with open(args.index, 'rb') as f:
-        idx = pickle.load(f)
-
-    weighted = 'weights' in idx
-    all_cat_ids = idx['station_ids']
-
-    # resolve catchment selection
-    if args.catchment_ids:
-        seed_ids = set(args.catchment_ids)
-        if args.upstream:
-            graph = build_upstream_graph(args.hydrofabric)
-            seed_ids = expand_upstream(seed_ids, graph)
-            print(f"  Expanded to {len(seed_ids)} catchments (including upstream)")
-        cat_mask = np.array([c in seed_ids for c in all_cat_ids])
-    else:
-        cat_mask = np.ones(len(all_cat_ids), dtype=bool)
-
-    out_cat_ids = all_cat_ids[cat_mask]
-    n_basins = int(cat_mask.sum())
-    print(f"  Outputting {n_basins} catchments")
-
-    if weighted:
-        cell_ids_list = [idx['cell_ids'][i] for i in np.where(cat_mask)[0]]
-        weights_list = [idx['weights'][i] for i in np.where(cat_mask)[0]]
-        print("  Area-weighted index")
-    else:
-        row_list_sel = [idx['row_list'][i] for i in np.where(cat_mask)[0]]
-        col_list_sel = [idx['col_list'][i] for i in np.where(cat_mask)[0]]
-        pixel_counts = [len(r) for r in row_list_sel]
-        row_flat = [x for sub in row_list_sel for x in sub]
-        col_flat = [x for sub in col_list_sel for x in sub]
-        print(f"  Equal-weight index, {sum(pixel_counts)} total pixels")
-
-    # open and slice AORC
-    print(f"Opening AORC zarr(s) for {start} -> {end} ...")
-    ds = open_aorc(start, end)
-    time_vals = ds.time.values
-    n_hours = len(time_vals)
-    print(f"  {n_hours} hourly timesteps loaded")
-
-    # subset spatially to the pixel bbox — avoids downloading the full CONUS grid
-    print("  Subsetting to pixel bounding box...")
-    if weighted:
-        ds, cell_ids_list = spatial_subset_weighted(ds, cell_ids_list)
-    else:
-        ds, row_flat, col_flat = spatial_subset_equal(ds, row_flat, col_flat)
-
-    if do_15min:
-        print("  Will disaggregate to 15-min after extraction")
-
-    # compute catchment centroids from the bbox grid coords (used in NetCDF output)
-    lat_bbox = ds.latitude.values
-    lon_bbox = ds.longitude.values
-
-    if weighted:
-        n_sub_cols = len(lon_bbox)
-        cat_lats, cat_lons = [], []
-        for cids, w in zip(cell_ids_list, weights_list):
-            wn = w / w.sum()
-            cat_lats.append(float(np.dot(wn, lat_bbox[cids // n_sub_cols])))
-            cat_lons.append(float(np.dot(wn, lon_bbox[cids % n_sub_cols])))
-    else:
-        cuts = np.cumsum(pixel_counts)[:-1]
-        rows_per = np.split(np.asarray(row_flat, dtype=int), cuts)
-        cols_per = np.split(np.asarray(col_flat, dtype=int), cuts)
-        cat_lats = [float(lat_bbox[r].mean()) for r in rows_per]
-        cat_lons = [float(lon_bbox[c].mean()) for c in cols_per]
-
-    cat_lats = np.array(cat_lats, dtype=np.float32)
-    cat_lons = np.array(cat_lons, dtype=np.float32)
-
-    os.makedirs(args.output_dir, exist_ok=True)
-    t0 = time.time()
-
-    # build the output time coordinate once, before the variable loop
-    if do_15min:
-        t0_m = time_vals[0].astype('datetime64[m]')
-        out_times = t0_m + np.arange(n_hours * 4) * np.timedelta64(15, 'm')
-        if trim_slice is not None:
-            out_times = out_times[trim_slice[0] : trim_slice[1]]
-    else:
-        out_times = time_vals.astype('datetime64[h]')
-
-    n_steps = len(out_times)
-
-    nc_path = os.path.join(args.output_dir, 'aorc_extracted.nc')
-    nc_out = netCDF4.Dataset(nc_path, 'w', format='NETCDF4')
-    nc_out.createDimension('catchment', n_basins)
-    nc_out.createDimension('time', n_steps)
-
-    epoch = np.datetime64('1970-01-01T00:00', 'm')
-    time_num = (out_times.astype('datetime64[m]') - epoch).astype(np.int64)
-    v_time = nc_out.createVariable('time', 'i8', ('time',))
-    v_time.units = "minutes since 1970-01-01 00:00:00 UTC"
-    v_time.calendar = 'standard'
-    v_time[:] = time_num
-
-    v_cat = nc_out.createVariable('divide_id', str, ('catchment',))
-    v_cat.long_name = "NextGen catchment ID"
-    v_cat[:] = np.array(out_cat_ids, dtype=object)
-
-    v_lat = nc_out.createVariable('latitude', 'f4', ('catchment',))
-    v_lat.units = 'degrees_north'
-    v_lat.standard_name = 'latitude'
-    v_lat[:] = cat_lats
-
-    v_lon = nc_out.createVariable('longitude', 'f4', ('catchment',))
-    v_lon.units = 'degrees_east'
-    v_lon.standard_name = 'longitude'
-    v_lon[:] = cat_lons
-
-    # pre-build sparse weight matrix (weighted path) — built once, reused per variable
-    if weighted:
-        n_pixels = len(lat_bbox) * len(lon_bbox)
-        print("  Building sparse weight matrix...")
-        W = build_weight_matrix(cell_ids_list, weights_list, n_basins, n_pixels)
-
-    # fetch all variables in a single dask graph execution (parallel S3 reads)
-    print(f"  Fetching all {len(args.variables)} variables from zarr...")
-    t_fetch = time.time()
-    ds_computed = ds[list(args.variables)].compute()
-    print(f"  Fetch complete ({time.time() - t_fetch:.1f}s)")
-
-    print(f"Streaming to {nc_path} ({n_basins} catchments * {n_steps} steps)")
-
-    for var_name in args.variables:
-        print(f"  {var_name}...", end=" ", flush=True)
-        t_var = time.time()
-
-        raw = ds_computed[var_name].values  # (hours, bbox_lat, bbox_lon)
-
-        if weighted:
-            flat = raw.reshape(n_hours, -1)
-            result = weighted_mean(flat, W)
-        else:
-            raw_sel = raw[..., row_flat, col_flat]  # (hours, total_pixels)
-            result = groupby_mean_equal(raw_sel.T, pixel_counts)
-        del raw
-
-        if do_15min:
-            result, _ = disaggregate_to_15min(result, var_name, time_vals)
-            if trim_slice is not None:
-                result = result[:, trim_slice[0] : trim_slice[1]]
-
-        nc_var = nc_out.createVariable(
-            var_name,
-            'f4',
-            ('catchment', 'time'),
-            zlib=True,
-            complevel=1,
-            chunksizes=(n_basins, min(n_steps, 1000)),
+        manifest, event_catchment_windows = build_manifest(
+            vpu_events,
+            cache_dir,
+            tag=vpu,
+            window_days=window_days,
+            centroid=centroid,
         )
-        nc_var.coordinates = "divide_id latitude longitude"
-        nc_var[:] = result.astype(np.float32)
+        log.info('manifest: %d events resolved to upstream catchments', len(manifest))
 
-        del result
-        print(f"done ({time.time() - t_var:.1f}s)")
+        divide_id_of = dict(
+            zip(vpu_events['event_id'].astype(str), vpu_events['gage_cat-id']),
+        )
 
-    del ds_computed
-    ds.close()
+        divide_ids = event_catchment_windows['divide_id'].unique()
+        weight_idx = build_weighted_crosswalk(
+            divide_ids,
+            catchments_master,
+            cache_dir,
+            tag=vpu,
+            max_workers=max_workers,
+        )
+        log.info('weighted crosswalk: %d catchments', len(weight_idx['station_ids']))
 
-    nc_out.close()
+        build_shards(manifest, weight_idx, vpu_dir, antecedent_days=antecedent_days)
 
-    print(f"\nComplete in {time.time() - t0:.1f}s  |  shape: ({n_basins}, {n_steps})")
+        extract_all(
+            manifest,
+            event_catchment_windows,
+            weight_idx,
+            vpu_dir / 'shards',
+            hr_part,
+            min15_part,
+            divide_id_of,
+            antecedent_days=antecedent_days,
+            max_15min_steps=max_15min_steps,
+        )
+        hr_parts.append(hr_part)
+        min15_parts.append(min15_part)
+
+    if vpu_subset is None:
+        merge_hr_parts(hr_parts, out_hr_nc)
+        merge_15min_parts(min15_parts, out_15min_nc)
+    else:
+        log.info('VPU subset %s done -> %s', vpu_subset, hr_parts + min15_parts)
+        log.info(
+            'Run other VPU subsets separately, then merge remaining parts together.',
+        )
 
 
 if __name__ == '__main__':
-    main()
+    aorc_extract()
