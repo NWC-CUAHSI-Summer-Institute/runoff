@@ -12,6 +12,11 @@ if not _CONFIG_PATH.exists():
 with open(_CONFIG_PATH) as f:
     _config = yaml.safe_load(f)
 
+_root = str(_config['root']).rstrip('/')
+for _key, _value in _config.items():
+    if isinstance(_value, str):
+        _config[_key] = _value.replace('${root}', _root)
+
 HYDROFABRIC_GPKG = Path(_config['hydrofabric_gpkg'])
 EVENTS_CSV = Path(_config['events_csv'])
 CACHE_DIR = Path(_config['cache_dir'])

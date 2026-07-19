@@ -18,7 +18,7 @@ log = logging.getLogger('mrms-merge')
 
 # CONFIG -------------------------- #
 # Per-VPU mrms_15min_part.nc files to merge.
-PARTS = sorted((CACHE_DIR / 'vpu_runs').glob('*/mrms_15min_part.nc'))
+PARTS = sorted((CACHE_DIR / 'mrms_runs').glob('*/mrms_15min_part.nc'))
 
 # Output NetCDF path for the merged 15-min MRMS precipitation.
 OUT_NC = CACHE_DIR / 'mrms_15min.nc'
