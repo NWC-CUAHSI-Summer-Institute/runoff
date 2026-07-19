@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.mrms import (
+from runoff.mrms import (
     load_hydrofabric,
     build_crosswalk,
     build_manifest,
@@ -27,16 +27,15 @@ from archive.flash_preprocess.src.flash_preprocess.mrms import (
     extract_all,
     merge_parts,
 )
-from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from runoff import CACHE_DIR, EVENTS_CSV
 
 log = logging.getLogger('mrms-extract')
 
 
 # CONFIG -------------------------- #
 # Flash flood event registry.
-#   None = all events in EVENTS_CSV; else e.g.
-EVENTS_CSV = _EVENTS_CSV
+#   None = default path set in runoff config.
+EVENTS_CSV = None
 EVENT_IDS = None
 
 # VPUs to process in this runtime.
@@ -49,17 +48,18 @@ VPU_SUBSET = None
 #   Else, disables end-of-run auto-merge.
 TAG_SUFFIX = ''
 
-# Where to cache per-VPU windows, timesteps, and NetCDF shards. 
-CACHE_DIR = _CACHE_DIR
+# Where to cache per-VPU windows, timesteps, and NetCDF shards.
+#   None = default path set in runoff config.
+CACHE_DIR = None
 
 # Output NetCDF path for merged 15-min MRMS precipitation.
-OUT_NC = _CACHE_DIR / 'mrms_15min.nc'
+OUT_NC = CACHE_DIR / 'mrms_15min.nc'
 
 # Margin (degrees) added around each VPU's bbox before downloading.
 BBOX_MARGIN_DEG = 0.1
 
 # More workers == faster. Make sure you have enough CPUs (=workers) and RAM.
-MAX_WORKERS = 100
+MAX_WORKERS = 32
 
 # Total width of each event's forcing window (days), centered on CENTROID.
 #    Must match WINDOW_DAYS used for the AORC run.

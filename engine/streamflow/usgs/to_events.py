@@ -11,23 +11,20 @@ import netCDF4
 import numpy as np
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from runoff import EVENTS_CSV, _EPOCH
 
-log = logging.getLogger('USGS-ToEvents')
-
-_EPOCH = pd.Timestamp('1970-01-01', tz='UTC')
-_MIN_TO_NS = 60 * 1_000_000_000  # nanoseconds per minute
+log = logging.getLogger('usgs-to-events')
 
 
 # CONFIG -------------------------- #
 # Merged 15-min forcing NetCDF (from merge_15min.py); provides event windows.
-FORCING_NC = _EVENTS_CSV.parent / 'forcing_15min.nc'
+FORCING_NC = EVENTS_CSV.parent / 'forcing_15min.nc'
 
 # Long-format USGS discharge CSV (from extract.py's OUTPUT_CSV).
-CSV_PATH = _EVENTS_CSV.parent / 'usgs_discharge.csv'
+DISCHARGE_PATH = EVENTS_CSV.parent / 'usgs_discharge.csv'
 
 # Output event-indexed NetCDF path.
-OUTPUT_NC = _EVENTS_CSV.parent / 'streamflow.nc'
+OUTPUT_NC = EVENTS_CSV.parent / 'streamflow.nc'
 
 # zlib compression level 1-9.
 COMPLEVEL = 4
@@ -66,7 +63,7 @@ def parse_args():
     parser.add_argument(
         '--csv',
         type=Path,
-        default=CSV_PATH,
+        default=DISCHARGE_PATH,
         help="Path to long-format USGS discharge CSV (default: %(default)s)",
     )
     parser.add_argument(

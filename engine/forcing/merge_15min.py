@@ -1,47 +1,18 @@
 r"""Merge AORC and MRMS 15-min NetCDFs into a single combined forcing file.
 
-MRMS's `storm_id` is the same ID as AORC's `event_id` (aggregate_events.py
-names its files storm_<event_id>_15min.nc). This script:
-  1. Joins AORC and MRMS on event_id (MRMS storm_id cast to str).
-  2. Aligns catchments by ID *per event* (inner join on divide_id / catchment
-     strings, independently for each matched event).
-  3. Writes a combined NetCDF using ragged (CSR) per-event catchment storage
-     -- see flash_preprocess.mrms.merge_parts for why: AORC and MRMS parts
-     can each span several disjoint-catchment VPUs/basins, and unioning
-     every event's catchments onto one shared dense axis scales with the
-     *sum* of every basin's catchments rather than any single event's own
-     (small) upstream set.
+- Joins on event_id (MRMS's storm_id)
+- inner-joins catchments per event (never unioned across events, so this scales
+    to many disjoint VPUs/basins)
+- writes the result using ragged (CSR) per-event catchment storage.
 
-Output
-------
-  Coordinates:
-    event_id        (event,)     str     shared AORC/MRMS event ID
-    n_steps         (event,)     i32     valid 15-min steps (minimum of both sources)
-    ts_start        (event,)     f64     start of the window (minutes since 1970-01-01)
-    ts_end          (event,)     f64     end of the window (minutes since 1970-01-01)
-    event_gage_id   (event,)     str     zero-padded 8-digit USGS gauge downstream of event
-    event_divide_id (event,)     str     NextGen catchment ID downstream of event
-    cat_ptr         (event+1,)   i64     CSR offsets: event i's catchments are
-                                          entry[cat_ptr[i]:cat_ptr[i+1]]
-    divide_id       (entry,)     str     NextGen divide ID (per-event inner join)
-    latitude        (entry,)     f32
-    longitude       (entry,)     f32
-
-  Variables (all (entry, time_step) f32):
-    P     from MRMS
-    T     from AORC
-    PET   from AORC
+Outputs:
+    - Combined 15-min forcing NetCDF: P (from MRMS), T/PET (from AORC),
+      ragged per-event catchments (cat_ptr gives each event's entry range).
 
 Edit the CONFIG block at the top of this file to set all options, or
 override per-invocation via CLI flags (see below).
 
-Usage
------
-    python engine/forcing/merge_15min.py \\
-        --aorc     /path/to/aorc_15min.nc \\
-        --aorc-hr  /path/to/aorc_hr.nc \\
-        --mrms     /path/to/mrms_15min.nc \\
-        --output   /path/to/forcing_15min.nc
+@drworm
 """
 
 import argparse
@@ -53,25 +24,24 @@ import netCDF4
 import numpy as np
 from tqdm.auto import tqdm
 
-from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from runoff import CACHE_DIR, EVENTS_CSV
 
-log = logging.getLogger('MergeForcing')
+log = logging.getLogger('merge-forcing')
 
 
 # CONFIG -------------------------- #
 # AORC 15-min forcing NetCDF (output of aorc/extract.py).
-AORC_NC = _CACHE_DIR / 'aorc_15min.nc'
+AORC_NC = CACHE_DIR / 'aorc_15min.nc'
 
 # AORC hourly antecedent NetCDF (output of aorc/extract.py); used only to
-# check that its warmup window ends exactly where the MRMS event window begins.
-AORC_HR_NC = _CACHE_DIR / 'aorc_hr.nc'
+#   check that its warmup window ends exactly where the MRMS event window begins.
+AORC_HR_NC = CACHE_DIR / 'aorc_hr.nc'
 
 # MRMS 15-min forcing NetCDF (output of mrms/extract.py).
-MRMS_NC = _CACHE_DIR / 'mrms_15min.nc'
+MRMS_NC = CACHE_DIR / 'mrms_15min.nc'
 
 # Output combined forcing NetCDF.
-OUTPUT_NC = _EVENTS_CSV.parent / 'forcing_15min.nc'
+OUTPUT_NC = EVENTS_CSV.parent / 'forcing_15min.nc'
 
 # zlib compression level 1-9.
 COMPLEVEL = 4
@@ -168,11 +138,6 @@ def merge_forcing() -> None:
         skipped,
     )
 
-    # Both files' event windows come from the same build_manifest() logic,
-    # but only if both were built from run_pipeline.py runs with matching
-    # WINDOW_DAYS/CENTROID -- a stale file from an older config would merge
-    # silently, splicing MRMS precip for one time window onto AORC
-    # temperature/PET for a different one. Catch that here instead.
     aorc_ts_start_chk = np.array(nc_aorc.variables['ts_start'][:], dtype=np.float64)
     mrms_ts_start_chk = np.array(nc_mrms.variables['ts_start'][:], dtype=np.float64)
     offset_min = aorc_ts_start_chk[aorc_indices] - mrms_ts_start_chk[mrms_indices]
@@ -186,11 +151,7 @@ def merge_forcing() -> None:
             f"both from the same run_pipeline.py config before merging.",
         )
 
-    # The AORC hourly antecedent file (30-day warmup) must end exactly where
-    # the MRMS event window begins, with no gap or overlap -- its stored
-    # ts_end is the timestamp of the *last hourly step itself* (an hourly
-    # value at hour H covers [H, H+1)), so the true end of the warmup period
-    # is ts_end + 60 min, which should equal MRMS's ts_start exactly.
+    # The AORC hourly antecedent file (30-day warmup) must end where MRMS begins
     nc_aorc_hr = netCDF4.Dataset(args.aorc_hr, 'r')
     aorc_hr_event_ids = _load_str_var(nc_aorc_hr, 'event_id')
     aorc_hr_idx = {eid: i for i, eid in enumerate(aorc_hr_event_ids)}

@@ -48,8 +48,8 @@ try:
 except RuntimeError:
     _HAVE_ECCODES = False
 
-from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as GPKG_PATH
-from archive.flash_preprocess.src.flash_preprocess.utils import build_upstream_graph, expand_upstream
+from runoff import HYDROFABRIC_GPKG
+from runoff.utils import build_upstream_graph, expand_upstream
 
 pyproj.network.set_network_enabled(False)
 warnings.filterwarnings('ignore')
@@ -117,18 +117,18 @@ def load_hydrofabric(
         )
 
     network = gpd.read_file(
-        GPKG_PATH,
+        HYDROFABRIC_GPKG,
         layer='network',
         columns=['id', 'toid', 'divide_id', 'vpuid'],
         read_geometry=False,
     )
     divides = gpd.read_file(
-        GPKG_PATH,
+        HYDROFABRIC_GPKG,
         layer='divides',
         columns=['divide_id', 'id', 'toid', 'areasqkm'],
     )
-    flowpaths = gpd.read_file(GPKG_PATH, layer='flowpaths', columns=['id', 'toid'])
-    nexus = gpd.read_file(GPKG_PATH, layer='nexus', columns=['id', 'toid'])
+    flowpaths = gpd.read_file(HYDROFABRIC_GPKG, layer='flowpaths', columns=['id', 'toid'])
+    nexus = gpd.read_file(HYDROFABRIC_GPKG, layer='nexus', columns=['id', 'toid'])
 
     net_lookup = network.dropna(subset=['divide_id']).drop_duplicates('divide_id')[
         ['divide_id', 'vpuid']
@@ -284,7 +284,7 @@ def _upstream_graph(cache_dir: Path) -> dict:
     f = Path(cache_dir) / 'upstream_graph.pkl'
     if f.exists():
         return pickle.loads(f.read_bytes())
-    graph = build_upstream_graph(str(GPKG_PATH))
+    graph = build_upstream_graph(str(HYDROFABRIC_GPKG))
     _atomic_write(lambda p: Path(p).write_bytes(pickle.dumps(graph)), f)
     return graph
 

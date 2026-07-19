@@ -10,18 +10,18 @@ import argparse
 import logging
 from pathlib import Path
 
-from archive.flash_preprocess.src.flash_preprocess.mrms import merge_parts
-from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from runoff.mrms import merge_parts
+from runoff import CACHE_DIR
 
 log = logging.getLogger('mrms-merge')
 
 
 # CONFIG -------------------------- #
 # Per-VPU mrms_15min_part.nc files to merge.
-PARTS = sorted((_CACHE_DIR / 'vpu_runs').glob('*/mrms_15min_part.nc'))
+PARTS = sorted((CACHE_DIR / 'vpu_runs').glob('*/mrms_15min_part.nc'))
 
 # Output NetCDF path for the merged 15-min MRMS precipitation.
-OUT_NC = _CACHE_DIR / 'mrms_15min.nc'
+OUT_NC = CACHE_DIR / 'mrms_15min.nc'
 # -------------------------- #
 
 

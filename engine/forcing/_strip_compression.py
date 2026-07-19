@@ -1,6 +1,8 @@
 r"""Rewrite an event-indexed forcing NetCDF without zlib compression.
 
 Stripping compression trades disk space for a ~30-60x reduction in per-run time.
+
+NOTE: experimental, and probably broken.
 """
 
 import argparse

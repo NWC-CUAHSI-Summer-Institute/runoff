@@ -20,24 +20,24 @@ from pathlib import Path
 
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.mrms import load_hydrofabric, build_manifest
-from archive.flash_preprocess.src.flash_preprocess.aorc import (
+from runoff.mrms import load_hydrofabric, build_manifest
+from runoff.aorc import (
     build_weighted_crosswalk,
     build_shards,
     extract_all,
     merge_hr_parts,
     merge_15min_parts,
 )
-from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from runoff import CACHE_DIR, EVENTS_CSV
 
 log = logging.getLogger('aorc-extract')
 
 
 # CONFIG -------------------------- #
 # Flash flood event registry.
+#   None = default path set in runoff config.
+EVENTS_CSV = None
 #   None = all events in EVENTS_CSV; else e.g. [1266, 4703]
-EVENT_PATH = _EVENTS_CSV
 EVENT_IDS = None
 
 # VPUs to process in this runtime.
@@ -46,11 +46,12 @@ EVENT_IDS = None
 VPU_SUBSET = None
 
 # Where to cache per-VPU AORC windows, weights, and NetCDF shards.
-CACHE_DIR = _CACHE_DIR
+#   None = default path set in runoff config.
+CACHE_DIR = None
 
 # Output NetCDF paths for 1) merged hourly and 2) 15-min AORC forcing.
-OUT_HR_NC = _CACHE_DIR / 'aorc_hr.nc'
-OUT_15MIN_NC = _CACHE_DIR / 'aorc_15min.nc'
+OUT_HR_NC = CACHE_DIR / 'aorc_hr.nc'
+OUT_15MIN_NC = CACHE_DIR / 'aorc_15min.nc'
 
 # More workers == faster. Make sure you have enough CPUs (=workers) and RAM.
 MAX_WORKERS = 32
@@ -77,7 +78,7 @@ FRESH_START = False
 def parse_args():
     """Parse command-line overrides for the CONFIG block above."""
     p = argparse.ArgumentParser(description='AORC forcing extraction pipeline')
-    p.add_argument('--events-csv', type=Path, default=EVENT_PATH)
+    p.add_argument('--events-csv', type=Path, default=EVENTS_CSV)
     p.add_argument(
         '--vpu-subset',
         default=None,

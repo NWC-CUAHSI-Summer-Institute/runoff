@@ -28,8 +28,9 @@ from dask.diagnostics import ProgressBar
 from scipy.sparse import csr_matrix
 from tqdm.auto import tqdm
 
-from archive.flash_preprocess.src.flash_preprocess.pet import penman_monteith_pet
-from archive.flash_preprocess.src.flash_preprocess.utils import get_cell_weights
+from runoff.pet import penman_monteith_pet
+from runoff.utils import get_cell_weights
+from runoff import _EPOCH
 
 
 _pool = ThreadPool(int(os.environ.get('AORC_S3_THREADS', 64)))
@@ -38,12 +39,7 @@ atexit.register(_pool.terminate)
 
 log = logging.getLogger('aorc')
 
-# fsspec caches S3FileSystem instances by constructor args, so every
-# `s3fs.S3FileSystem(anon=True)` call in open_aorc() below returns this same
-# object -- close its underlying aiohttp session once at process exit rather
-# than per-call (closing it mid-run would break any dataset still lazily
-# reading through it). Without this, aiohttp logs a noisy but harmless
-# "Unclosed client session" warning during garbage collection at shutdown.
+# fsspec caches S3FileSystem instances by constructor args
 _S3_FS = s3fs.S3FileSystem(anon=True)
 
 
@@ -51,7 +47,7 @@ def _close_s3_session() -> None:
     """Best-effort close of the shared S3 filesystem's aiohttp session."""
     try:
         s3fs.S3FileSystem.close_session(_S3_FS.loop, _S3_FS.s3)
-    except Exception:  # noqa: BLE001 -- best-effort cleanup, never fail on exit
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -76,7 +72,6 @@ ACCUM_VARS = {'APCP_surface'}
 # Hourly warmup window preceding each event's sub-hourly window (default: 6d).
 ANTECEDENT_DAYS = 30.0
 
-_EPOCH = np.datetime64('1970-01-01T00:00', 'm')
 _AORC_NCOLS = 8401  # CONUS grid width
 _AORC_NROWS = 4201
 _AORC_LAT0 = 20.0  # southernmost latitude
