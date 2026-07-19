@@ -1,38 +1,14 @@
-r"""Extract and subset the CONUS NextGen HydroFabric for flash-flood event sims.
+r"""Extract/subset CONUS NextGen Hydrofabric for flash-flood event sims.
 
-Reads divide IDs from a CSV column (or an explicit list), subsets the
-HydroFabric to those catchments plus their full upstream network, derives
-the river topology DAG, locates USGS gages within the region, and writes
-everything needed for dMG runtime (see
+- Reads divide IDs from a CSV column
+- subsets Hydrofabric to catchments plus full upstream network
+- derives river topology DAG
+- locates USGS gages within the region
+- writes everything needed for dMG (differentiable model) runtime (see
 https://github.com/mhpi/generic_deltamodel).
 
-Output
-------
-  {output-dir}/divides.gpkg
-      Catchment divide geometries + key attributes
-  {output-dir}/topology.json
-      River network DAG:
-        {
-            "nodes": [int, ...],
-            "edges": [[upstream_int, downstream_int], ...],
-            "gage_hf": {"USGS_gage_id": outlet_int_divide_id, ...}
-        }
-  {output-dir}/gauges.csv
-      USGS gage metadata: STAID, DRAIN_SQKM, divide_id
-
-Usage
------
-    # From a CSV column (e.g. gage_divide_id)
-    python engine/geo/extract_hf.py \\
-        --csv /path/to/events_and_gages.csv \\
-        --gpkg /path/to/conus_nextgen.gpkg \\
-        --output-dir /path/to/output/
-
-    # From an explicit list of divide IDs
-    python engine/geo/extract_hf.py \\
-        --divide-ids cat-251968 cat-251969 cat-251970 \\
-        --gpkg /path/to/conus_nextgen.gpkg \\
-        --output-dir /path/to/output/
+Edit the CONFIG block at the top of this file to set all options, or
+override per-invocation via CLI flags (see below).
 """
 
 import argparse
@@ -44,12 +20,34 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
 from flash_preprocess.utils import build_upstream_graph, expand_upstream
 
-log = logging.getLogger('ExtractHF')
+log = logging.getLogger('HF-Extract')
 
 
-DEFAULT_COLUMN_DIVIDE_ID = 'gage_cat-id'
+# CONFIG -------------------------- #
+# CSV containing a column of seed divide IDs.
+#   Ignored if DIVIDE_IDS is set.
+CSV_PATH = _EVENTS_CSV
+CSV_COLUMN = 'gage_cat-id'
+
+# Explicit list of seed divide IDs, used instead of CSV_PATH/CSV_COLUMN.
+#   None -- use CSV_PATH/CSV_COLUMN instead.
+DIVIDE_IDS = None
+
+# Hydrofabric GeoPackage path.
+GPKG = _HYDROFABRIC_GPKG
+
+# Output directory for divides.gpkg / topology.json / gauges.csv.
+OUTPUT_DIR = _CACHE_DIR.parent
+
+# True -- expand seed divides to their full upstream network.
+# False -- only keep the seed divide IDs, no upstream expansion.
+UPSTREAM = True
+# -------------------------- #
 
 
 def _cat_to_int(cat_id: str) -> int:
@@ -103,9 +101,7 @@ def build_full_upstream_network(
     list[tuple[int, int]]
         List of (upstream_int, downstream_int) tuples representing flow direction.
     """
-    # graph: downstream divide_id -> [upstream divide_ids], joined directly
-    # via divides/nexus/flowpaths instead of a LIKE-filtered self-join on
-    # the much larger denormalized `network` table.
+    # graph: downstream divide_id -> [upstream divide_ids]
     graph = build_upstream_graph(hf_path)
     visited = expand_upstream(divide_ids, graph)
 
@@ -144,27 +140,27 @@ def find_gages_in_region(
     DataFrame
         columns: STAID, divide_id (int), DRAIN_SQKM.
     """
-    # Split the OR join into two indexed queries and UNION — a single JOIN with
+    # Split the OR join into two indexed queries and UNION: a single JOIN with
     # OR prevents SQLite from using any index, causing a full cross-scan.
     rows = conn.execute(
         """
-        SELECT h.hl_link                         AS STAID,
-               CAST(SUBSTR(h.id, 4) AS INTEGER)  AS divide_id,
-               d.tot_drainage_areasqkm           AS DRAIN_SQKM
-        FROM   hydrolocations h
-        JOIN   divides d ON d.divide_id = h.nex_id
-        WHERE  h.hl_reference IN ('gages', 'usgs-gage')
-          AND  h.id LIKE 'wb-%'
+        SELECT h.hl_link AS STAID,
+               CAST(SUBSTR(h.id, 4) AS INTEGER) AS divide_id,
+               d.tot_drainage_areasqkm AS DRAIN_SQKM
+        FROM hydrolocations h
+        JOIN divides d ON d.divide_id = h.nex_id
+        WHERE h.hl_reference IN ('gages', 'usgs-gage')
+          AND h.id LIKE 'wb-%'
 
         UNION
 
         SELECT h.hl_link,
                CAST(SUBSTR(h.id, 4) AS INTEGER),
                d.tot_drainage_areasqkm
-        FROM   hydrolocations h
-        JOIN   divides d ON 'wb' || SUBSTR(d.divide_id, 4) = h.id
-        WHERE  h.hl_reference IN ('gages', 'usgs-gage')
-          AND  h.id LIKE 'wb-%'
+        FROM hydrolocations h
+        JOIN divides d ON 'wb' || SUBSTR(d.divide_id, 4) = h.id
+        WHERE h.hl_reference IN ('gages', 'usgs-gage')
+          AND h.id LIKE 'wb-%'
         """,
     ).fetchall()
 
@@ -211,48 +207,47 @@ def build_topology_json(
     }
 
 
-def main():
-    """Parse CLI args and run the HydroFabric extraction."""
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
-
-    # Parse command-line arguments
+def parse_args():
+    """Parse command-line overrides for the CONFIG block above."""
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    src = parser.add_mutually_exclusive_group(required=True)
+    src = parser.add_mutually_exclusive_group()
     src.add_argument(
         '--csv',
         type=Path,
-        help='CSV file containing a column of divide IDs',
+        default=CSV_PATH,
+        help='CSV file containing a column of divide IDs (default: %(default)s)',
     )
     src.add_argument(
         '--divide-ids',
         nargs='+',
+        default=DIVIDE_IDS,
         metavar='cat-XXXXX',
-        help='Explicit list of seed divide IDs',
+        help='Explicit list of seed divide IDs (default: CSV_PATH/CSV_COLUMN)',
     )
     parser.add_argument(
         '--csv-column',
-        default=DEFAULT_COLUMN_DIVIDE_ID,
+        default=CSV_COLUMN,
         help="Column in --csv holding divide IDs (default: %(default)s)",
     )
     parser.add_argument(
         '--gpkg',
         type=Path,
-        required=True,
-        help='Path to conus_nextgen.gpkg',
+        default=GPKG,
+        help='Path to conus_nextgen.gpkg (default: config.yaml hydrofabric_gpkg)',
     )
     parser.add_argument(
         '--output-dir',
         type=Path,
-        required=True,
-        help='Output directory',
+        default=OUTPUT_DIR,
+        help='Output directory (default: %(default)s)',
     )
     parser.add_argument(
         '--upstream',
         action='store_true',
-        default=True,
+        default=UPSTREAM,
         help='Expand to full upstream network (default: on)',
     )
     parser.add_argument(
@@ -261,15 +256,21 @@ def main():
         action='store_false',
         help='Only keep seed divide IDs, no upstream expansion',
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def extract_hf():
+    """Run the Hydrofabric extraction."""
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
+    args = parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     # collect seed divide ids
-    if args.csv:
-        seed_ids = collect_divide_ids_from_csv(args.csv, args.csv_column)
-    else:
+    if args.divide_ids:
         seed_ids = args.divide_ids
+    else:
+        seed_ids = collect_divide_ids_from_csv(args.csv, args.csv_column)
 
     log.info('Seed divide IDs: %d', len(seed_ids))
 
@@ -295,7 +296,7 @@ def main():
             layer='divides',
             where=f"divide_id IN ({','.join(repr(c) for c in cat_ids)})",
         )
-    except Exception:  # noqa: BLE001 -- driver-specific error type varies by backend (pyogrio/fiona)
+    except RuntimeError:
         log.warning('WHERE clause failed, falling back to full read + filter')
         gdf = gpd.read_file(gpkg_path, layer='divides')
         gdf = gdf[gdf['divide_id'].isin(set(cat_ids))].reset_index(drop=True)
@@ -327,4 +328,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    extract_hf()

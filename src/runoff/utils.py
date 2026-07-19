@@ -1,14 +1,18 @@
+import logging
 import sqlite3
 from collections import deque
 
+import geopandas as gpd
 import pandas as pd
 import xarray as xr
-import geopandas as gpd
 from exactextract import exact_extract
 from exactextract.raster import NumPyRasterSource
 
+from flash_preprocess.paths import HYDROFABRIC_GPKG
 
-HF_PATH_DEFAULT = '/Users/leoglonz/.ngiab/hydrofabric/v2.2/conus_nextgen.gpkg'
+log = logging.getLogger('Utils')
+
+HF_PATH_DEFAULT = str(HYDROFABRIC_GPKG)
 
 
 def build_upstream_graph(hf_path: str) -> dict[str, list[str]]:
@@ -24,15 +28,15 @@ def build_upstream_graph(hf_path: str) -> dict[str, list[str]]:
     dict
         Mapping of divide_id -> list of upstream divide_ids.
     """
-    print("  Building upstream graph from hydrofabric...")
+    log.info('Building upstream graph from hydrofabric...')
     conn = sqlite3.connect(hf_path)
     divides = pd.read_sql("SELECT divide_id, toid FROM divides", conn)
     nexus = pd.read_sql("SELECT id, toid FROM nexus", conn)
     flowpaths = pd.read_sql("SELECT id, divide_id FROM flowpaths", conn)
     conn.close()
 
-    nex_to_wb = nexus.set_index("id")["toid"].to_dict()
-    wb_to_cat = flowpaths.set_index("id")["divide_id"].to_dict()
+    nex_to_wb = nexus.set_index('id')['toid'].to_dict()
+    wb_to_cat = flowpaths.set_index('id')['divide_id'].to_dict()
 
     upstream = {}
     for row in divides.itertuples(index=False):
@@ -85,19 +89,19 @@ def get_cell_weights(
 
     Parameters
     ----------
-    raster : xr.Dataset
+    raster
         One timestep of a gridded forcings dataset.
-    gdf : gpd.GeoDataFrame
+    gdf
         A GeoDataFrame with a polygon feature.
-    wkt : str
+    wkt
         Well-known text (WKT) representation of gdf's coordinate reference
-        system (CRS)
+        system (CRS).
 
     Returns
     -------
     pd.DataFrame
-        DataFrame indexed by divide_id that contains information about coverage
-        for each raster cell in gridded forcing file.
+        DataFrame indexed by divide_id with coverage info for each raster
+        cell in the gridded forcing file.
     """
     xmin = min(raster.x)
     xmax = max(raster.x)
@@ -115,8 +119,8 @@ def get_cell_weights(
     output: pd.DataFrame = exact_extract(
         rastersource,
         gdf,
-        ["cell_id", "coverage"],
-        include_cols=["divide_id"],
-        output="pandas",
+        ['cell_id', 'coverage'],
+        include_cols=['divide_id'],
+        output='pandas',
     )  # type: ignore
-    return output.set_index("divide_id")
+    return output.set_index('divide_id')
