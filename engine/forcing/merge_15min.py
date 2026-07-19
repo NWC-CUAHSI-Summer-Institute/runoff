@@ -31,7 +31,7 @@ log = logging.getLogger('merge-forcing')
 
 # CONFIG -------------------------- #
 # AORC 15-min forcing NetCDF (output of aorc/extract.py).
-AORC_NC = CACHE_DIR / 'aorc_15min.nc'
+AORC_NC = CACHE_DIR.parent / 'aorc_15min.nc'
 
 # AORC hourly antecedent NetCDF (output of aorc/extract.py); used only to
 #   check that its warmup window ends exactly where the MRMS event window begins.
