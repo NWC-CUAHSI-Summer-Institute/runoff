@@ -9,6 +9,8 @@ https://github.com/mhpi/generic_deltamodel).
 
 Edit the CONFIG block at the top of this file to set all options, or
 override per-invocation via CLI flags (see below).
+
+@drworm
 """
 
 import argparse
@@ -20,12 +22,12 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
-from flash_preprocess.utils import build_upstream_graph, expand_upstream
+from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
+from archive.flash_preprocess.src.flash_preprocess.utils import build_upstream_graph, expand_upstream
 
-log = logging.getLogger('HF-Extract')
+log = logging.getLogger('hf-extract')
 
 
 # CONFIG -------------------------- #

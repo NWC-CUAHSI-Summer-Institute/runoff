@@ -10,10 +10,10 @@ import argparse
 import logging
 from pathlib import Path
 
-from flash_preprocess.mrms import merge_parts
-from flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from archive.flash_preprocess.src.flash_preprocess.mrms import merge_parts
+from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
 
-log = logging.getLogger('MRMS-Merge')
+log = logging.getLogger('mrms-merge')
 
 
 # CONFIG -------------------------- #

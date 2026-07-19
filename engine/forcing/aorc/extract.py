@@ -20,18 +20,18 @@ from pathlib import Path
 
 import pandas as pd
 
-from flash_preprocess.mrms import load_hydrofabric, build_manifest
-from flash_preprocess.aorc import (
+from archive.flash_preprocess.src.flash_preprocess.mrms import load_hydrofabric, build_manifest
+from archive.flash_preprocess.src.flash_preprocess.aorc import (
     build_weighted_crosswalk,
     build_shards,
     extract_all,
     merge_hr_parts,
     merge_15min_parts,
 )
-from flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
 
-log = logging.getLogger('AORC-Extract')
+log = logging.getLogger('aorc-extract')
 
 
 # CONFIG -------------------------- #

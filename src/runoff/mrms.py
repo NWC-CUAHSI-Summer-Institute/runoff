@@ -48,13 +48,13 @@ try:
 except RuntimeError:
     _HAVE_ECCODES = False
 
-from flash_preprocess.paths import HYDROFABRIC_GPKG as GPKG_PATH
-from flash_preprocess.utils import build_upstream_graph, expand_upstream
+from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as GPKG_PATH
+from archive.flash_preprocess.src.flash_preprocess.utils import build_upstream_graph, expand_upstream
 
 pyproj.network.set_network_enabled(False)
 warnings.filterwarnings('ignore')
 
-log = logging.getLogger('MRMS')
+log = logging.getLogger('mrms')
 
 
 ### DEFAULTS --------------- #

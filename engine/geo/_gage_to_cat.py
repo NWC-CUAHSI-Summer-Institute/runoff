@@ -15,10 +15,10 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
 
-log = logging.getLogger('Gage-ToCat')
+log = logging.getLogger('gage-to-cat')
 
 
 # CONFIG -------------------------- #

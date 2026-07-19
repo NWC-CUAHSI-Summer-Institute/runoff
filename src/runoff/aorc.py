@@ -28,15 +28,15 @@ from dask.diagnostics import ProgressBar
 from scipy.sparse import csr_matrix
 from tqdm.auto import tqdm
 
-from flash_preprocess.pet import penman_monteith_pet
-from flash_preprocess.utils import get_cell_weights
+from archive.flash_preprocess.src.flash_preprocess.pet import penman_monteith_pet
+from archive.flash_preprocess.src.flash_preprocess.utils import get_cell_weights
 
 
 _pool = ThreadPool(int(os.environ.get('AORC_S3_THREADS', 64)))
 dask.config.set(pool=_pool)
 atexit.register(_pool.terminate)
 
-log = logging.getLogger('AORC')
+log = logging.getLogger('aorc')
 
 # fsspec caches S3FileSystem instances by constructor args, so every
 # `s3fs.S3FileSystem(anon=True)` call in open_aorc() below returns this same
