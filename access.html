@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Access RUNOFF - build your experiment</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+.wrap{display:grid;grid-template-columns:380px 1fr;gap:0;border-bottom:1px solid var(--line)}
+.rail{border-right:1px solid var(--line);background:var(--bg2);
+      height:calc(100vh - 54px);overflow-y:auto;display:flex;flex-direction:column}
+.rail .body{padding:16px 18px;flex:1}
+.rail .navbtns{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);
+  background:var(--bg2);position:sticky;bottom:0}
+.rail h2{font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin:4px 0 4px}
+.rail .hint{font-size:12.5px;color:var(--muted);margin:0 0 14px}
+.rail label.f{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:12.5px;color:var(--muted);margin:14px 0 4px}
+.rail label.f b{color:var(--text);font-size:12.5px}
+.rail input[type=number],.rail select{width:100%;padding:7px 9px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:6px;color:var(--text);font:13.5px inherit}
+.rail input[type=range]{width:100%;accent-color:var(--gold)}
+.radio{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border:1px solid var(--line2);
+  border-radius:8px;margin-bottom:8px;cursor:pointer;background:var(--panel)}
+.radio:hover{border-color:var(--gold)}
+.radio input{margin-top:3px;accent-color:var(--gold)}
+.radio b{display:block;font-size:13.5px}
+.radio span{font-size:12px;color:var(--muted)}
+.statelist{max-height:230px;overflow-y:auto;border:1px solid var(--line2);border-radius:8px;
+  padding:8px 10px;background:var(--panel);display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px}
+.statelist label{font-size:12.5px;color:var(--text);display:flex;gap:6px;align-items:center}
+.statelist input{accent-color:var(--gold)}
+.btn2{flex:1;padding:11px 14px;border-radius:8px;border:1px solid var(--line2);
+  background:var(--panel);color:var(--text);font-size:13.5px;font-weight:700;cursor:pointer}
+.btn2:hover{border-color:var(--gold)}
+.btn2.gold{background:var(--gold);border-color:var(--gold);color:#161308}
+.btn2.gold:hover{background:var(--gold-d)}
+.btn2:disabled{opacity:.4;cursor:default}
+.readout{font-size:12.5px;color:var(--muted);margin-top:12px;border:1px solid var(--line2);
+  border-radius:8px;padding:10px 12px;background:var(--panel)}
+.readout b{color:var(--gold)}
+.sumline{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);
+  padding:6px 0;border-bottom:1px solid var(--line)}
+.sumline b{color:var(--text)}
+.ready{background:rgba(63,158,106,.12);border:1px solid rgba(63,158,106,.55);color:#bfe3cf;
+  border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:12px}
+.i{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--gold);
+   color:var(--gold);font-size:10px;font-weight:700;align-items:center;justify-content:center;
+   cursor:help;position:relative;font-family:Georgia,serif;vertical-align:1px}
+.i:hover::after{content:attr(data-tip);position:absolute;bottom:130%;left:0;
+  width:250px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
+  font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;z-index:3000;text-align:left}
+/* map + overlays */
+.maparea{position:relative}
+#map{height:calc(100vh - 54px);background:#0b0e13}
+.stepbar{position:absolute;top:10px;left:64px;right:12px;z-index:950;display:flex;gap:6px;
+  background:rgba(11,14,19,.92);border:1px solid var(--line);border-radius:10px;padding:8px;
+  overflow-x:auto}
+.stepbar .st{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:7px;
+  font-size:12.5px;color:var(--dim);white-space:nowrap;cursor:default;border:1px solid transparent}
+.stepbar .st .n{width:20px;height:20px;border-radius:50%;border:1px solid var(--dim);
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
+.stepbar .st.done{color:#9fd4b6;cursor:pointer}
+.stepbar .st.done .n{background:var(--green);border-color:var(--green);color:#08120c}
+.stepbar .st.cur{color:var(--text);background:var(--panel2);border-color:var(--line2)}
+.stepbar .st.cur .n{background:var(--gold);border-color:var(--gold);color:#161308}
+.layerbox{position:absolute;bottom:16px;left:12px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
+.layerbox label{display:flex;gap:7px;align-items:center;margin:3px 0;color:var(--text)}
+.layerbox input{accent-color:var(--gold)}
+.legend{position:absolute;bottom:16px;right:12px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
+.legend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
+.legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.legend .dt{width:9px;height:9px;border-radius:50%;display:inline-block}
+@media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:52vh}#map{height:56vh}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="name">RUN<b>OFF</b></span>
+    <span class="sub"><b>R</b>adar and <b>U</b>SGS <b>N</b>etworked<br><b>O</b>bservations of <b>F</b>lash <b>F</b>loods</span>
+  </a>
+  <div class="partners">
+    <img src="assets/logos/ciroh.png" alt="CIROH" onerror="this.outerHTML='<span class=p>CIROH</span>'">
+    <img src="assets/logos/cuahsi.png" alt="CUAHSI" onerror="this.outerHTML='<span class=p>CUAHSI</span>'">
+    <img src="assets/logos/si2026.png" alt="Summer Institute 2026" onerror="this.outerHTML='<span class=p>Summer Institute 2026</span>'">
+  </div>
+  <nav class="toplinks">
+    <a href="about.html">About</a>
+    <a class="cta" href="access.html">Access Dataset</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <aside class="rail">
+    <div class="body" id="railbody"></div>
+    <div class="navbtns">
+      <button class="btn2" id="btn-back">Back</button>
+      <button class="btn2 gold" id="btn-next">Next</button>
+    </div>
+  </aside>
+  <div class="maparea">
+    <div id="map"></div>
+    <div class="stepbar" id="stepbar"></div>
+    <div class="layerbox">
+      <label><input type="checkbox" id="ly-huc" checked> HUC8 watersheds</label>
+      <label><input type="checkbox" id="ly-gag" checked> USGS gages</label>
+    </div>
+    <div class="legend">
+      <div class="k"><span class="sw" style="border:1px solid #566275"></span>HUC8 watershed</div>
+      <div class="k"><span class="sw" style="background:rgba(63,158,106,.35);border:1px solid #3f9e6a"></span>selected basins</div>
+      <div class="k"><span class="dt" style="background:#f2b705"></span>event-linked gage</div>
+      <div class="k"><span class="dt" style="background:#5c6a7d"></span>gage under 1000 km2</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="wordmark">RUN<b>OFF</b></div>
+      <p>A flash flood benchmark dataset built at the CUAHSI and NOAA National Water
+      Center Summer Institute 2026 by Team "Don't Runoff!".</p>
+    </div>
+    <div>
+      <h4>Dataset</h4>
+      <a href="about.html">About RUNOFF</a>
+      <a href="access.html">Access Data</a>
+      <a href="https://www.hydroshare.org/" target="_blank" rel="noopener">HydroShare (coming soon)</a>
+    </div>
+    <div>
+      <h4>Community</h4>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute" target="_blank" rel="noopener">Summer Institute GitHub</a>
+      <a href="https://ciroh.ua.edu/" target="_blank" rel="noopener">CIROH</a>
+      <a href="https://www.cuahsi.org/" target="_blank" rel="noopener">CUAHSI</a>
+    </div>
+  </div>
+  <div class="credits">All data on this website is experimental and provided for research
+  purposes only.</div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="assets/data/data.js"></script>
+<script src="assets/data/huc8.js"></script>
+<script src="assets/js/access.js"></script>
+</body>
+</html>

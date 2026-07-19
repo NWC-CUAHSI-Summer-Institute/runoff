@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About RUNOFF</title>
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="name">RUN<b>OFF</b></span>
+    <span class="sub">Radar and USGS Networked<br>Observations of Flash Floods</span>
+  </a>
+  <div class="partners">
+    <img src="assets/logos/ciroh.png" alt="CIROH" onerror="this.outerHTML='<span class=p>CIROH</span>'">
+    <img src="assets/logos/cuahsi.png" alt="CUAHSI" onerror="this.outerHTML='<span class=p>CUAHSI</span>'">
+    <img src="assets/logos/si2026.png" alt="Summer Institute 2026" onerror="this.outerHTML='<span class=p>Summer Institute 2026</span>'">
+  </div>
+  <nav class="toplinks">
+    <a href="about.html">About</a>
+    <a class="cta" href="access.html">Access Dataset</a>
+  </nav>
+</header>
+
+<main class="page">
+  <h1>About <b>RUNOFF</b></h1>
+  <p class="sub">What the dataset is, why it exists, and how it is built.</p>
+
+  <div class="section">
+    <h2>Why RUNOFF</h2>
+    <p>
+      Flash floods develop in small basins within minutes to a few hours of intense
+      rainfall. The community datasets that accelerated rainfall-runoff modeling,
+      such as CAMELS and Caravan, are daily or hourly, basin-mean, and centered on
+      basins larger than the ones that flash flood. No open benchmark pairs
+      sub-hourly radar precipitation with gage discharge at event scale on an
+      operational catchment network. RUNOFF fills that gap. Any flash flood modeling
+      effort in the United States, inside or outside the NextGen framework, can use
+      it for calibration, evaluation, and benchmarking.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>How the dataset is built</h2>
+    <div class="step"><div class="num">1</div><div>
+      <h3>Flood reports, water years 2021-2025</h3>
+      <p>We start from 19,993 flash flood observations in the NOAA Storm Events
+      Database. The period is chosen deliberately: it overlaps the dual-polarization
+      algorithm era of the MRMS quantitative precipitation estimation product, so
+      every event pairs with radar rainfall of consistent quality.</p>
+    </div></div>
+    <div class="step"><div class="num">2</div><div>
+      <h3>Report aggregation into events</h3>
+      <p>Reports describing the same storm are merged on two criteria: overlapping
+      spatial buffers built from each report's start and end locations, and the
+      shared Storm Events episode identifier. This aggregation also reveals the
+      regions most exposed to repeated flash flooding.</p>
+    </div></div>
+    <div class="step"><div class="num">3</div><div>
+      <h3>Pairing with USGS gages at flash flood scale</h3>
+      <p>Events are kept only when an upstream or downstream USGS gage from the
+      GAGES-II inventory, in a basin smaller than 1000 km2, can serve as the
+      reference observation. Gages are snapped to the NextGen HydroFabric flowpath
+      network to make the pairing hydrologically consistent. 7,990 events survive.</p>
+    </div></div>
+    <div class="step"><div class="num">4</div><div>
+      <h3>Radar quality screening</h3>
+      <p>Radar coverage of each event's upstream catchment is used as a proxy for
+      QPE uncertainty: it measures how well the radar sees precipitation reaching
+      the ground, not whether data exist. Events with at least 80 percent coverage
+      are retained. The final catalog holds 5,097 flash flood events.</p>
+    </div></div>
+    <div class="step"><div class="num">5</div><div>
+      <h3>Forcing and observations for every event</h3>
+      <p>Each event carries 2-minute MRMS PrecipRate radar precipitation, hourly
+      AORC meteorology, USGS instantaneous discharge in UTC, and reported impacts
+      (fatalities, damage). A one-time crosswalk maps every MRMS grid cell onto the
+      NextGen HydroFabric, covering 98.8 percent of CONUS catchments, so radar
+      forcing drops directly into NextGen simulations.</p>
+    </div></div>
+  </div>
+
+  <div class="section">
+    <h2>Event separation</h2>
+    <p>
+      Observed hydrographs are separated into individual flood events with the
+      NOAA-OWP HydroTools decomposition method, using parameters tuned for flashy,
+      small-basin response (one-hour smoothing half-life, two-day window, one-hour
+      minimum event duration). Events are then filtered against the flow duration
+      curve: only events whose peak exceeds a chosen exceedance threshold, Q25 by
+      default, enter the dataset. For every event the pipeline reports peak flow,
+      peak time, runoff volume, duration, time to peak, and the Richards-Baker
+      flashiness index, all timestamped in UTC.
+    </p>
+    <div class="note">
+      The full extraction pipeline ships in this repository under
+      <code>engine/events/</code>. Point it at any HUC8 watershed and it
+      rebuilds the event record from live USGS data:
+      <code>python engine/events/extract.py --huc8 03020201 --wy-start 2021 --wy-end 2025</code>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>What is in the dataset</h2>
+    <table class="data">
+      <tr><th>Component</th><th>Source</th><th>Resolution</th><th>Notes</th></tr>
+      <tr><td>Radar precipitation</td><td>MRMS PrecipRate (radar-only)</td><td>2 min, 0.01 deg</td><td>near real time, no gauge correction</td></tr>
+      <tr><td>Gauge-corrected precipitation</td><td>MRMS MultiSensor Pass 1 / Pass 2</td><td>1 h, 0.01 deg</td><td>gauge-bias corrected, higher latency</td></tr>
+      <tr><td>Meteorology</td><td>NOAA AORC v1.1</td><td>1 h, 0.8 km</td><td>temperature, humidity, wind, pressure, radiation</td></tr>
+      <tr><td>Streamflow</td><td>USGS NWIS instantaneous values</td><td>15 min</td><td>reference observations, UTC</td></tr>
+      <tr><td>Events and impacts</td><td>NOAA Storm Events Database</td><td>event scale</td><td>fatalities, damage, cause</td></tr>
+      <tr><td>Network</td><td>NextGen HydroFabric v2.2</td><td>catchment</td><td>831,777 CONUS catchments</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Status</h2>
+    <div class="note">
+      RUNOFF v1.0 is experimental and under active development at the CUAHSI and
+      NOAA National Water Center Summer Institute 2026. Formats, file layouts, and
+      the MRMS-to-AORC forcing adapter are still evolving. A versioned release with
+      a DOI will be published on HydroShare.
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Team and credits</h2>
+    <p>
+      Built by Team "Don't Runoff!" at the Summer Institute 2026: Jessica Keiser,
+      Leo Lonzarich, Azizur Rahman, with theme leaders Mohamed Abdelkader and
+      Humberto Vergara.
+    </p>
+  </div>
+</main>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="wordmark">RUN<b>OFF</b></div>
+      <p>A flash flood benchmark dataset built at the CUAHSI and NOAA National Water
+      Center Summer Institute 2026 by Team "Don't Runoff!".</p>
+    </div>
+    <div>
+      <h4>Dataset</h4>
+      <a href="about.html">About RUNOFF</a>
+      <a href="access.html">Access Data</a>
+      <a href="https://www.hydroshare.org/" target="_blank" rel="noopener">HydroShare (coming soon)</a>
+    </div>
+    <div>
+      <h4>Community</h4>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute" target="_blank" rel="noopener">Summer Institute GitHub</a>
+      <a href="https://ciroh.ua.edu/" target="_blank" rel="noopener">CIROH</a>
+      <a href="https://www.cuahsi.org/" target="_blank" rel="noopener">CUAHSI</a>
+    </div>
+  </div>
+  <div class="credits">
+    All data on this website is experimental and provided for research purposes only.
+    Event detection builds on <a href="https://github.com/NOAA-OWP/hydrotools" target="_blank" rel="noopener">NOAA-OWP HydroTools</a>.
+  </div>
+</footer>
+
+</body>
+</html>

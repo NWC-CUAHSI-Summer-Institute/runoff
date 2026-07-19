@@ -85,3 +85,22 @@ We welcome contributions! See [CONTRIBUTING.md](https://github.com/mhpi/generic_
 ---
 
 *Please submit an [issue](https://github.com/mhpi/generic_deltamodel/issues) to report any questions, concerns, bugs, etc.*
+
+
+</br>
+
+## Website
+
+The RUNOFF access portal lives in this repository and is served with GitHub Pages:
+`index.html` (landing), `about.html` (how the dataset is built), and `access.html`
+(the experiment builder: pick a geographic scope, filter watersheds, choose USGS
+products and forcing, download a package of engine commands preconfigured for your
+selection). Map data sits in `assets/data/` (simplified HUC8 GeoJSON and the gage
+table); design notes in `docs/WEBSITE_DESIGN.md`.
+
+Local preview:
+
+```bash
+python -m http.server
+# open http://localhost:8000
+```

@@ -226,3 +226,7 @@ __marimo__/
 *_dev*
 event_extraction_inputs/huc8_conus/
 event_extraction/event_extraction_inputs/huc8_conus/
+
+# OS noise
+.DS_Store
+Thumbs.db
