@@ -87,4 +87,3 @@ DETECT_KWARGS = {
 For slower, larger watersheds you may want to increase `halflife` (e.g. `'6h'`) and `window` (e.g. `'7D'`).
 
 ---
-

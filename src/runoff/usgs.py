@@ -191,7 +191,9 @@ def load_discharge_series(
         if not df.empty:
             frames.append(df)
     if not frames:
-        raise ValueError(f'No {parameter_code} data for site {site} in WY{wy_start}-{wy_end}')
+        raise ValueError(
+            f'No {parameter_code} data for site {site} in WY{wy_start}-{wy_end}',
+        )
 
     raw = pd.concat(frames, ignore_index=True)
     raw['datetime'] = pd.to_datetime(raw['datetime'], utc=True)

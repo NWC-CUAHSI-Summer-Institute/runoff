@@ -101,15 +101,20 @@ def run(
 
     sites, coords = gages_in_huc8(huc8, huc8_shp, gages_csv)
     pd.DataFrame({'STAID': sites}).to_csv(
-        output_dir / f'stations_huc8_{huc8}.csv', index=False,
+        output_dir / f'stations_huc8_{huc8}.csv',
+        index=False,
     )
     log.info('%d site(s): %s | WY%d-%d', len(sites), ', '.join(sites), wy_start, wy_end)
 
     results = {}
     for site in sites:
         table = process_site(
-            site, wy_start, wy_end,
-            coords=coords, q_exceedance_pct=q_exceedance_pct, **DETECT_KWARGS,
+            site,
+            wy_start,
+            wy_end,
+            coords=coords,
+            q_exceedance_pct=q_exceedance_pct,
+            **DETECT_KWARGS,
         )
         if table is not None:
             results[site] = table

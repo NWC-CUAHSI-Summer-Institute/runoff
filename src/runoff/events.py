@@ -78,8 +78,15 @@ def gages_in_huc8(huc8_id: str, huc8_shp, gages_csv) -> tuple[list[str], dict]:
     inside['STAID'] = inside['STAID'].apply(normalize_staid)
     inside = inside.drop_duplicates('STAID').sort_values('STAID').reset_index(drop=True)
 
-    coords = {row['STAID']: (row['LAT_GAGE'], row['LNG_GAGE']) for _, row in inside.iterrows()}
-    log.info('Found %d gage(s) in HUC8 %s: %s', len(inside), huc8_id, ', '.join(inside['STAID']))
+    coords = {
+        row['STAID']: (row['LAT_GAGE'], row['LNG_GAGE']) for _, row in inside.iterrows()
+    }
+    log.info(
+        'Found %d gage(s) in HUC8 %s: %s',
+        len(inside),
+        huc8_id,
+        ', '.join(inside['STAID']),
+    )
     return inside['STAID'].tolist(), coords
 
 
@@ -91,7 +98,9 @@ def compute_fdc(q: pd.Series) -> pd.DataFrame:
     n = len(flows_sorted)
     rank = np.arange(1, n + 1)
     exceedance = 100.0 * rank / (n + 1)
-    return pd.DataFrame({'exceedance_percent': exceedance, 'discharge_cfs': flows_sorted})
+    return pd.DataFrame(
+        {'exceedance_percent': exceedance, 'discharge_cfs': flows_sorted},
+    )
 
 
 def q_exceedance(fdc: pd.DataFrame, percent: float) -> float:
@@ -129,8 +138,11 @@ def detect_events(
         minimum_event_duration=minimum_event_duration,
         start_radius=start_radius,
     )
-    events['peak'] = events.apply(lambda e: series.loc[e.start:e.end].max(), axis=1)
-    events['t_peak'] = events.apply(lambda e: series.loc[e.start:e.end].idxmax(), axis=1)
+    events['peak'] = events.apply(lambda e: series.loc[e.start : e.end].max(), axis=1)
+    events['t_peak'] = events.apply(
+        lambda e: series.loc[e.start : e.end].idxmax(),
+        axis=1,
+    )
     return events.reset_index(drop=True)
 
 
@@ -167,7 +179,11 @@ def flashiness_index(series: pd.Series, start, end) -> float:
     return float(np.abs(np.diff(s)).sum() / denom) if denom > 0 else np.nan
 
 
-def build_event_table(series: pd.Series, events: pd.DataFrame, staid: str) -> pd.DataFrame:
+def build_event_table(
+    series: pd.Series,
+    events: pd.DataFrame,
+    staid: str,
+) -> pd.DataFrame:
     """One row per event with the requested columns (time fields are UTC)."""
     rows = []
     for e in events.itertuples():
@@ -193,9 +209,19 @@ def build_event_table(series: pd.Series, events: pd.DataFrame, staid: str) -> pd
         )
 
     cols = [
-        'STAID', 'BEGIN_DATE_TIME', 'END_DATE_TIME', 'peak_time', 'peak_flow_cfs',
-        'volume_acreft', 'flashiness_index', 'YEAR', 'month', 'day',
-        'water_year', 'duration_hours', 'time_to_peak_h',
+        'STAID',
+        'BEGIN_DATE_TIME',
+        'END_DATE_TIME',
+        'peak_time',
+        'peak_flow_cfs',
+        'volume_acreft',
+        'flashiness_index',
+        'YEAR',
+        'month',
+        'day',
+        'water_year',
+        'duration_hours',
+        'time_to_peak_h',
     ]
     return pd.DataFrame(rows, columns=cols)
 
@@ -220,7 +246,11 @@ def process_site(
 
     log.info(
         '[%s] %d steps | min %.2f  mean %.1f  max %.0f cfs',
-        site, len(q), q.min(), q.mean(), q.max(),
+        site,
+        len(q),
+        q.min(),
+        q.mean(),
+        q.max(),
     )
 
     fdc = compute_fdc(q)
@@ -234,7 +264,10 @@ def process_site(
     events = events[events['peak'] >= q_thr].reset_index(drop=True)
     log.info(
         '[%s] removed %d events (peak < Q%.0f); %d remain',
-        site, n_total - len(events), q_exceedance_pct, len(events),
+        site,
+        n_total - len(events),
+        q_exceedance_pct,
+        len(events),
     )
     if events.empty:
         log.info('[%s] no events after filtering; skipping.', site)
@@ -254,5 +287,10 @@ def combine_tables(tables: dict, out_path) -> pd.DataFrame:
     master = pd.concat(tables.values(), ignore_index=True)
     master.insert(0, 'event_id', range(1, len(master) + 1))
     master.to_csv(out_path, index=False)
-    log.info('Combined %d site(s) -> %s (%d total events)', len(tables), out_path, len(master))
+    log.info(
+        'Combined %d site(s) -> %s (%d total events)',
+        len(tables),
+        out_path,
+        len(master),
+    )
     return master
