@@ -1,9 +1,8 @@
 # src/flash_preprocess/__init__.py
 
-from .utils import build_upstream_graph, expand_upstream, HF_PATH_DEFAULT
+from .utils import build_upstream_graph, expand_upstream
 
 __all__ = [
     'build_upstream_graph',
     'expand_upstream',
-    'HF_PATH_DEFAULT',
 ]

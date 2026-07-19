@@ -11,7 +11,7 @@ import netCDF4
 import numpy as np
 import pandas as pd
 
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
 
 log = logging.getLogger('USGS-ToEvents')
 

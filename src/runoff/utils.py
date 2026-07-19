@@ -8,11 +8,8 @@ import xarray as xr
 from exactextract import exact_extract
 from exactextract.raster import NumPyRasterSource
 
-from flash_preprocess.paths import HYDROFABRIC_GPKG
 
-log = logging.getLogger('Utils')
-
-HF_PATH_DEFAULT = str(HYDROFABRIC_GPKG)
+log = logging.getLogger('utils')
 
 
 def build_upstream_graph(hf_path: str) -> dict[str, list[str]]:

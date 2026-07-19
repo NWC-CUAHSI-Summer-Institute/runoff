@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from flash_preprocess.mrms import (
+from archive.flash_preprocess.src.flash_preprocess.mrms import (
     load_hydrofabric,
     build_crosswalk,
     build_manifest,
@@ -27,10 +27,10 @@ from flash_preprocess.mrms import (
     extract_all,
     merge_parts,
 )
-from flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
 
-log = logging.getLogger('MRMS-Extract')
+log = logging.getLogger('mrms-extract')
 
 
 # CONFIG -------------------------- #

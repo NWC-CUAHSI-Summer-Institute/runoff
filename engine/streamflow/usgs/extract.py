@@ -17,11 +17,11 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from flash_preprocess.paths import STUDY_START as _STUDY_START
-from flash_preprocess.paths import STUDY_END as _STUDY_END
+from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from archive.flash_preprocess.src.flash_preprocess.paths import STUDY_START as _STUDY_START
+from archive.flash_preprocess.src.flash_preprocess.paths import STUDY_END as _STUDY_END
 
-log = logging.getLogger('USGS-Extract')
+log = logging.getLogger('usgs-extract')
 
 
 # CONFIG -------------------------- #
