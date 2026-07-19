@@ -22,29 +22,24 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.paths import CACHE_DIR as _CACHE_DIR
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
-from archive.flash_preprocess.src.flash_preprocess.utils import build_upstream_graph, expand_upstream
+from runoff import CACHE_DIR, EVENTS_CSV, HYDROFABRIC_GPKG
+from runoff.utils import build_upstream_graph, expand_upstream
 
 log = logging.getLogger('hf-extract')
 
 
 # CONFIG -------------------------- #
-# CSV containing a column of seed divide IDs.
-#   Ignored if DIVIDE_IDS is set.
-CSV_PATH = _EVENTS_CSV
-CSV_COLUMN = 'gage_cat-id'
+# Events/gages CSV with column for divide IDs.
+#   None = default path set in runoff config.
+EVENTS_CSV = None
+GAGE_CAT_COL = 'gage_cat-id'
 
-# Explicit list of seed divide IDs, used instead of CSV_PATH/CSV_COLUMN.
-#   None -- use CSV_PATH/CSV_COLUMN instead.
+# Explicit list of seed divide IDs.
+#   None -- use EVENTS_CSV/GAGE_CAT_COL instead.
 DIVIDE_IDS = None
 
-# Hydrofabric GeoPackage path.
-GPKG = _HYDROFABRIC_GPKG
-
 # Output directory for divides.gpkg / topology.json / gauges.csv.
-OUTPUT_DIR = _CACHE_DIR.parent
+OUTPUT_DIR = CACHE_DIR.parent
 
 # True -- expand seed divides to their full upstream network.
 # False -- only keep the seed divide IDs, no upstream expansion.
@@ -142,8 +137,6 @@ def find_gages_in_region(
     DataFrame
         columns: STAID, divide_id (int), DRAIN_SQKM.
     """
-    # Split the OR join into two indexed queries and UNION: a single JOIN with
-    # OR prevents SQLite from using any index, causing a full cross-scan.
     rows = conn.execute(
         """
         SELECT h.hl_link AS STAID,
@@ -181,7 +174,7 @@ def build_topology_json(
     edges: list[tuple[int, int]],
     gages_df: pd.DataFrame,
 ) -> dict:
-    """Assemble the topology dict expected by FlashHydroLoader / MtsHydroLoader.
+    """Assemble the topology dict expected by dMG (generic_deltamodel).
 
     Parameters
     ----------
@@ -219,7 +212,7 @@ def parse_args():
     src.add_argument(
         '--csv',
         type=Path,
-        default=CSV_PATH,
+        default=EVENTS_CSV,
         help='CSV file containing a column of divide IDs (default: %(default)s)',
     )
     src.add_argument(
@@ -231,13 +224,13 @@ def parse_args():
     )
     parser.add_argument(
         '--csv-column',
-        default=CSV_COLUMN,
+        default=GAGE_CAT_COL,
         help="Column in --csv holding divide IDs (default: %(default)s)",
     )
     parser.add_argument(
         '--gpkg',
         type=Path,
-        default=GPKG,
+        default=HYDROFABRIC_GPKG,
         help='Path to conus_nextgen.gpkg (default: config.yaml hydrofabric_gpkg)',
     )
     parser.add_argument(

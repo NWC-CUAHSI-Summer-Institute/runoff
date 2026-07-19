@@ -15,24 +15,21 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from archive.flash_preprocess.src.flash_preprocess.paths import HYDROFABRIC_GPKG as _HYDROFABRIC_GPKG
+from runoff import EVENTS_CSV, HYDROFABRIC_GPKG
 
 log = logging.getLogger('gage-to-cat')
 
 
 # CONFIG -------------------------- #
-# CSV with gage STAID + lat/lon
-CSV_PATH = _EVENTS_CSV
+# Events/gages CSV with gage STAID + lat/lon
+#   None = default path set in runoff config.
+EVENTS_CSV = None
 STAID_COL = 'STAID'
 LAT_COL = 'gage_lat'
 LON_COL = 'gage_lon'
 
-# Hydrofabric GeoPackage path
-GPKG = _HYDROFABRIC_GPKG
-
 # Output CSV path (CSV_PATH plus a gage_cat-id column).
-OUTPUT_CSV = CSV_PATH.parent / 'events_with_cat_id.csv'
+OUTPUT_CSV = EVENTS_CSV.parent / 'events_with_cat_id.csv'
 # -------------------------- #
 
 
@@ -110,13 +107,13 @@ def parse_args():
     parser.add_argument(
         '--csv',
         type=Path,
-        default=CSV_PATH,
+        default=EVENTS_CSV,
         help='CSV with gage STAID + lat/lon (default: %(default)s)',
     )
     parser.add_argument(
         '--gpkg',
         type=Path,
-        default=GPKG,
+        default=HYDROFABRIC_GPKG,
         help='Path to conus_nextgen.gpkg (default: config.yaml hydrofabric_gpkg)',
     )
     parser.add_argument(

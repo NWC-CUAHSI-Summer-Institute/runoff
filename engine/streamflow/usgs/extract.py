@@ -17,21 +17,21 @@ import pandas as pd
 import requests
 from tqdm import tqdm
 
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
-from archive.flash_preprocess.src.flash_preprocess.paths import STUDY_START as _STUDY_START
-from archive.flash_preprocess.src.flash_preprocess.paths import STUDY_END as _STUDY_END
+from runoff import EVENTS_CSV, STUDY_START, STUDY_END
 
 log = logging.getLogger('usgs-extract')
 
 
 # CONFIG -------------------------- #
-# Events/gages CSV with a STAID column.
-EVENTS_CSV = _EVENTS_CSV
+# Flash flood event registry.
+#   None = default path set in runoff config.
+EVENTS_CSV = None
 STAID_COL = 'STAID'
 
 # Study period.
-STUDY_START = _STUDY_START
-STUDY_END = _STUDY_END
+#   None = default start/end set in runoff config.
+STUDY_START = None
+STUDY_END = None
 
 # NWIS parameter code (00060 = discharge).
 PARAMETER_CODE = '00060'

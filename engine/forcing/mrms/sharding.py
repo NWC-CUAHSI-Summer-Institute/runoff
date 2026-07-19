@@ -13,21 +13,22 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from archive.flash_preprocess.src.flash_preprocess.paths import EVENTS_CSV as _EVENTS_CSV
+from runoff import EVENTS_CSV
 
 log = logging.getLogger('mrms-shard')
 
 
 # CONFIG -------------------------- #
 # Events CSV to split
-EVENTS_CSV = _EVENTS_CSV
+#   None = default path set in runoff config.
+EVENTS_CSV = None
 
 # Number of shards to split EVENTS_CSV into.
 N_SHARDS = 8
 
 # Output directory for the shard CSVs.
 #   None -- defaults to EVENTS_CSV's own directory.
-OUT_DIR = _EVENTS_CSV.parent / 'cache' / 'event_shards'
+OUT_DIR = EVENTS_CSV.parent / 'cache' / 'event_shards'
 # -------------------------- #
 
 
