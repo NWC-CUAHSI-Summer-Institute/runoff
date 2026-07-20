@@ -45,6 +45,11 @@ OUTPUT_NC = EVENTS_CSV.parent / 'forcing_15min.nc'
 
 # zlib compression level 1-9.
 COMPLEVEL = 4
+
+# Sub-hourly timestep of the two input files in minutes (10, 15, 30 or 60).
+# Only used for default file names and units labels; the merge logic itself
+# is timestep-agnostic. Must match the extraction runs.
+TIMESTEP_MIN = 15
 # -------------------------- #
 
 
@@ -98,6 +103,14 @@ def parse_args():
         default=COMPLEVEL,
         help="zlib compression level 1-9 (default: %(default)s)",
     )
+    parser.add_argument(
+        '--timestep-min',
+        type=int,
+        default=TIMESTEP_MIN,
+        choices=[10, 15, 30, 60],
+        help="sub-hourly timestep of the inputs; sets default file names and "
+        "units labels (default: %(default)s)",
+    )
     return parser.parse_args()
 
 
@@ -105,6 +118,16 @@ def merge_forcing() -> None:
     """Run the AORC + MRMS merge pipeline."""
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
     args = parse_args()
+    ts = args.timestep_min
+    aorc_path, mrms_path, out_path = args.aorc, args.mrms, args.output
+    if ts != 15:
+        if aorc_path == AORC_NC:
+            aorc_path = AORC_NC.with_name(f'aorc_{ts}min.nc')
+        if mrms_path == MRMS_NC:
+            mrms_path = MRMS_NC.with_name(f'mrms_{ts}min.nc')
+        if out_path == OUTPUT_NC:
+            out_path = OUTPUT_NC.with_name(f'forcing_{ts}min.nc')
+    args.aorc, args.mrms, args.output = aorc_path, mrms_path, out_path
 
     # open source files
     nc_aorc = netCDF4.Dataset(args.aorc, 'r')
@@ -312,12 +335,12 @@ def merge_forcing() -> None:
         nv.coordinates = "event_id n_steps ts_start ts_end event_gage_id event_divide_id cat_ptr divide_id latitude longitude"
         return nv
 
-    v_p = _make_var('P', "mm [15 min]-1", "MRMS precipitation depth")
+    v_p = _make_var('P', f"mm [{ts} min]-1", "MRMS precipitation depth")
     v_t = _make_var('T', 'degC', "Air temperature at 2 m (interpolated)")
     v_pet = _make_var(
         'PET',
-        "mm [15 min]-1",
-        "Penman-Monteith ET0 (15-min, uniform split)",
+        f"mm [{ts} min]-1",
+        f"Penman-Monteith ET0 ({ts}-min, uniform split)",
     )
 
     log.info('Writing %d events ...', n_events)

@@ -30,3 +30,11 @@ gages_csv: ${root}/data/gages2_1000km2.csv
 #    separate from events_csv, which may already carry columns added by
 #    later pipeline stages (gage_cat-id, vpuid, ...).
 event_output_dir: ${root}/data/3-huc8/event_extraction
+
+# 8. Forcing timestep in minutes for engine/forcing scripts (10, 15, 30, 60).
+#    CLI --timestep-min overrides. 15 reproduces the original pipeline.
+forcing_timestep_min: 15
+
+# 9. Hourly MRMS product for engine/forcing/mrms/extract_hourly.py:
+#    radar_1h (RadarOnly_QPE_01H) | pass1 | pass2 (MultiSensor, gauge-corrected).
+mrms_hourly_product: radar_1h
