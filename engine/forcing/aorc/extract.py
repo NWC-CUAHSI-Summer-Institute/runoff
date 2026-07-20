@@ -64,6 +64,11 @@ CENTROID = 'peak'
 # Hourly warmup window (days) preceding each event's WINDOW_DAYS window.
 ANTECEDENT_DAYS = 30.0
 
+# Sub-hourly output timestep in minutes (10, 15, 30 or 60). AORC is always
+# hourly at source; it is disaggregated to this step. Must match the MRMS
+# run's --timestep-min. 15 = original behavior.
+TIMESTEP_MIN = 15
+
 # Caching
 #   True -- ignore cached per-VPU windows/weights/shards and rebuild.
 #   Needed after any change to WINDOW_DAYS/CENTROID/ANTECEDENT_DAYS.
@@ -97,6 +102,14 @@ def parse_args():
     p.add_argument('--centroid', choices=['midpoint', 'peak'], default=CENTROID)
     p.add_argument('--antecedent-days', type=float, default=ANTECEDENT_DAYS)
     p.add_argument('--fresh-start', action='store_true', default=FRESH_START)
+    p.add_argument(
+        '--timestep-min',
+        type=int,
+        default=TIMESTEP_MIN,
+        choices=[10, 15, 30, 60],
+        help='sub-hourly output step in minutes; must match the MRMS run '
+        '(default: %(default)s)',
+    )
     return p.parse_args()
 
 
@@ -135,9 +148,12 @@ def aorc_extract():
         antecedent_days,
     )
 
-    # 15-min steps in a window_days-wide window, + a small buffer for the
+    timestep_min = args.timestep_min
+    if timestep_min != 15 and out_15min_nc == OUT_15MIN_NC:
+        out_15min_nc = OUT_15MIN_NC.with_name(f'aorc_{timestep_min}min.nc')
+    # sub-hourly steps in a window_days-wide window, + a small buffer for the
     # outward hour-grid rounding in build_manifest.
-    max_15min_steps = int(round(window_days * 24 * 60 / 15)) + 1
+    max_15min_steps = int(round(window_days * 24 * 60 / timestep_min)) + 1
 
     hr_parts, min15_parts = [], []
     for vpu in vpus:
@@ -204,6 +220,7 @@ def aorc_extract():
             divide_id_of,
             antecedent_days=antecedent_days,
             max_15min_steps=max_15min_steps,
+            timestep_min=timestep_min,
         )
         hr_parts.append(hr_part)
         min15_parts.append(min15_part)

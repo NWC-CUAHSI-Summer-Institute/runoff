@@ -226,6 +226,39 @@ def groupby_mean_equal(data: np.ndarray, interval: np.ndarray) -> np.ndarray:
     return g_sum / g_count
 
 
+def disaggregate_to_step(
+    data: np.ndarray,
+    var_name: str,
+    time_hr: np.ndarray,
+    timestep_min: int = 15,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Disaggregate hourly catchment data to a sub-hourly step.
+
+    Generalization of disaggregate_to_15min: timestep_min may be any divisor
+    of 60 (10, 15, 30) or 60 itself (identity split).
+
+    Accumulated variables: uniform split (each hour divided into 60/timestep
+    equal parts). Instantaneous variables: linear interpolation between
+    hourly values.
+    """
+    k = 60 // timestep_min
+    if 60 % timestep_min:
+        raise ValueError(f"timestep_min={timestep_min} must divide 60")
+    n_hours = data.shape[1]
+    n_steps = n_hours * k
+    if var_name in ACCUMULATED_VARS:
+        data_sub = np.repeat(data / float(k), k, axis=1)
+    else:
+        x_sub = np.arange(n_steps, dtype=np.float64) * (timestep_min / 60.0)
+        i_low = np.clip(np.floor(x_sub).astype(int), 0, n_hours - 1)
+        i_high = np.clip(np.ceil(x_sub).astype(int), 0, n_hours - 1)
+        frac = (x_sub - i_low).astype(np.float32)
+        data_sub = data[:, i_low] * (1.0 - frac) + data[:, i_high] * frac
+    t0 = time_hr[0]
+    time_sub = t0 + np.arange(n_steps) * np.timedelta64(timestep_min, 'm')
+    return data_sub, time_sub
+
+
 def disaggregate_to_15min(
     data: np.ndarray,
     var_name: str,
@@ -618,8 +651,13 @@ def extract_all(
     divide_id_of: dict,
     antecedent_days: float = ANTECEDENT_DAYS,
     max_15min_steps: int = 577,
+    timestep_min: int = 15,
 ) -> None:
-    """Extract per-event hourly and 15-min AORC forcing to out_hr_nc/out_15min_nc.
+    """Extract per-event hourly and sub-hourly AORC forcing.
+
+    timestep_min sets the sub-hourly step (10, 15, 30 or 60); AORC is always
+    hourly at source and is disaggregated to this step before writing.
+    max_15min_steps caps the number of SUB-HOURLY steps regardless of name.
 
     Each event only ever gets its own upstream catchments (resolved from
     event_catchment_windows), not the VPU's full basin list.
@@ -706,8 +744,11 @@ def extract_all(
         temp_evt_c = cat_evt['TMP_2maboveground'] - 273.15
         pet_evt = _catchment_pet({**cat_evt, 'TMP_2maboveground': temp_evt_c})
         time_evt = time_dt[evt_mask]
-        tmp_15min, _ = disaggregate_to_15min(temp_evt_c, 'TMP', time_evt.values)
-        pet_15min = np.repeat(pet_evt / 4.0, 4, axis=1)
+        _k = 60 // timestep_min
+        tmp_15min, _ = disaggregate_to_step(
+            temp_evt_c, 'TMP', time_evt.values, timestep_min,
+        )
+        pet_15min = np.repeat(pet_evt / float(_k), _k, axis=1)
         n15 = min(tmp_15min.shape[1], max_15min_steps)
 
         hr_records.append(
@@ -736,7 +777,7 @@ def extract_all(
                 'lon': local_lon,
                 'n_steps': n15,
                 'ts_start': time_evt[0],
-                'ts_end': time_evt[0] + pd.Timedelta(minutes=15 * (n15 - 1)),
+                'ts_end': time_evt[0] + pd.Timedelta(minutes=timestep_min * (n15 - 1)),
                 'T': tmp_15min[:, :n15],
                 'PET': pet_15min[:, :n15],
             },
@@ -760,7 +801,10 @@ def extract_all(
         max_15min_steps,
         {
             'T': ('degC', "Air temperature at 2 m (interpolated)"),
-            'PET': ("mm 15min-1", "Penman-Monteith ET0 (15-min, uniform split)"),
+            'PET': (
+                f"mm {timestep_min}min-1",
+                f"Penman-Monteith ET0 ({timestep_min}-min, uniform split)",
+            ),
         },
     )
 
@@ -902,6 +946,9 @@ def merge_15min_parts(part_paths: Iterable[Path], out_nc: Path) -> None:
         out_nc,
         {
             'T': ('degC', "Air temperature at 2 m (interpolated)"),
-            'PET': ("mm 15min-1", "Penman-Monteith ET0 (15-min, uniform split)"),
+            'PET': (
+                f"mm {timestep_min}min-1",
+                f"Penman-Monteith ET0 ({timestep_min}-min, uniform split)",
+            ),
         },
     )

@@ -16,35 +16,35 @@ var S={
   scope:"runoff",
   fEv:0,fDeath:0,fDmgV:0,fStn:0,
   product:"events", qexc:25, wy0:2021, wy1:2025,
-  forcing:"radar_15min", byoPath:"", byoFmt:"zarr"
+  forcing:"radar_15min", byoPath:"", byoFmt:"zarr", byoFreq:15, byoUnits:"mm"
 };
 var MRMS_REGISTRY="https://registry.opendata.aws/noaa-mrms-pds/";
 var MRMS_BUCKET="https://noaa-mrms-pds.s3.amazonaws.com/index.html";
 var FORCING_META={
   radar_2min:{label:"Radar-only MRMS PrecipRate, 2-minute + AORC met",
     product:"CONUS/PrecipRate_00.00",timestep_min:2,gc:false,ready:true,
-    note:"native PrecipRate cadence, supported by the engine"},
+    note:"native PrecipRate cadence"},
   radar_10min:{label:"Radar-only MRMS PrecipRate, 10-minute + AORC met",
-    product:"CONUS/PrecipRate_00.00",timestep_min:10,gc:false,ready:false,
-    note:"accumulated from 2-minute scans; engine adjustment needed"},
+    product:"CONUS/PrecipRate_00.00",timestep_min:10,gc:false,ready:true,
+    note:"accumulated from 2-minute scans by the engine"},
   radar_15min:{label:"Radar-only MRMS PrecipRate, 15-minute + AORC met",
     product:"CONUS/PrecipRate_00.00",timestep_min:15,gc:false,ready:true,
-    note:"the engine's native merged product (P from MRMS, T and PET from AORC)"},
+    note:"the engine default"},
   radar_30min:{label:"Radar-only MRMS PrecipRate, 30-minute + AORC met",
-    product:"CONUS/PrecipRate_00.00",timestep_min:30,gc:false,ready:false,
-    note:"accumulated from 2-minute scans; engine adjustment needed"},
-  radar_60min:{label:"Radar-only MRMS PrecipRate, 1-hour + AORC met",
-    product:"CONUS/PrecipRate_00.00",timestep_min:60,gc:false,ready:false,
-    note:"radar-only at AORC cadence; engine adjustment needed"},
+    product:"CONUS/PrecipRate_00.00",timestep_min:30,gc:false,ready:true,
+    note:"accumulated from 2-minute scans by the engine"},
+  radar_60min:{label:"Radar-only MRMS RadarOnly_QPE_01H, 1-hour + AORC met",
+    product:"CONUS/RadarOnly_QPE_01H_00.00",timestep_min:60,gc:false,ready:true,
+    note:"hourly accumulation grids direct from AWS, no 2-minute download"},
   pass1_60min:{label:"MRMS MultiSensor Pass 1, 1-hour + AORC met",
-    product:"CONUS/MultiSensor_QPE_01H_Pass1_00.00",timestep_min:60,gc:true,ready:false,
-    note:"gauge-corrected, about 1 h latency; engine adjustment needed"},
+    product:"CONUS/MultiSensor_QPE_01H_Pass1_00.00",timestep_min:60,gc:true,ready:true,
+    note:"gauge-corrected, about 1 h latency"},
   pass2_60min:{label:"MRMS MultiSensor Pass 2, 1-hour + AORC met",
-    product:"CONUS/MultiSensor_QPE_01H_Pass2_00.00",timestep_min:60,gc:true,ready:false,
-    note:"gauge-corrected, about 12 h latency; engine adjustment needed"},
+    product:"CONUS/MultiSensor_QPE_01H_Pass2_00.00",timestep_min:60,gc:true,ready:true,
+    note:"gauge-corrected, about 12 h latency"},
   byo:{label:"User-supplied QPE/QPF brought to AORC format",
-    product:"user",timestep_min:null,gc:null,ready:false,
-    note:"conversion protocol and template included in the package"}
+    product:"user",timestep_min:null,gc:null,ready:true,
+    note:"declared frequency and units drive the converter"}
 };
 var BYO_FORMATS=["zarr","netcdf (.nc)","hdf5 (.h5)","grib2","geotiff","csv","other"];
 var DMG_MAX=3.2e8;
@@ -131,8 +131,7 @@ function renderStepbar(){
 /* ---------------- rail content per step ---------------- */
 function forcingRadio(key,title,sub){
   var fm=FORCING_META[key];
-  var badge=fm.ready?'<span style="color:#3f9e6a;font-size:10.5px;font-weight:800;letter-spacing:.5px"> ENGINE-READY</span>'
-                    :'<span style="color:#8e99a8;font-size:10.5px;letter-spacing:.5px"> spec only</span>';
+  var badge='<span style="color:#3f9e6a;font-size:10.5px;font-weight:800;letter-spacing:.5px"> ENGINE-READY</span>';
   return '<label class="radio"><input type="radio" name="forcing" value="'+key+'" '+(S.forcing===key?"checked":"")+'>'+
     '<span><b>'+title+badge+'</b><span>'+sub+'</span></span></label>';
 }
@@ -208,10 +207,15 @@ function railHtml(){
       '<label class="f">Path to your data</label>'+
       '<input type="text" id="byo-path" placeholder="/path/to/my_qpe" value="'+S.byoPath.replace(/"/g,"&quot;")+'" style="width:100%;padding:7px 9px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;color:var(--text);font:13px inherit">'+
       '<label class="f">Format</label>'+
-      '<select id="byo-fmt">'+BYO_FORMATS.map(function(f2){return '<option '+(f2===S.byoFmt?"selected":"")+'>'+f2+'</option>';}).join("")+'</select>'):"")+
-    '<div class="note" style="margin-top:10px">ENGINE-READY options run with the scripts in '+
-    'engine/forcing today. "Spec only" options are encoded in FORCING.json; the engine will '+
-    'be adjusted to user needs. MRMS source: <a href="'+MRMS_REGISTRY+'" target="_blank" rel="noopener">noaa-mrms-pds on AWS</a>.</div>';
+      '<select id="byo-fmt">'+BYO_FORMATS.map(function(f2){return '<option '+(f2===S.byoFmt?"selected":"")+'>'+f2+'</option>';}).join("")+'</select>'+
+      '<label class="f">Temporal frequency of your data (minutes)</label>'+
+      '<input type="number" id="byo-freq" min="1" max="1440" value="'+S.byoFreq+'" style="width:100%;padding:7px 9px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;color:var(--text);font:13px inherit">'+
+      '<label class="f">Units of your data</label>'+
+      '<select id="byo-units">'+["mm","mm/h","in","in/h","kg m-2"].map(function(u){return '<option '+(u===S.byoUnits?"selected":"")+'>'+u+'</option>';}).join("")+'</select>'):"")+
+    '<div class="note" style="margin-top:10px">Every option runs with the scripts in '+
+    'engine/forcing: sub-hourly cadences via --timestep-min, hourly products via '+
+    'extract_hourly.py, your own product via byo/convert.py. MRMS source: '+
+    '<a href="'+MRMS_REGISTRY+'" target="_blank" rel="noopener">noaa-mrms-pds on AWS</a>.</div>';
   /* step 5 */
   var fm=FORCING_META[S.forcing];
   return ''+
@@ -275,6 +279,8 @@ function wire(){
     r.addEventListener("change",function(e){S.forcing=e.target.value;render();});});
   if(el("byo-path")) el("byo-path").addEventListener("input",function(e){S.byoPath=e.target.value;});
   if(el("byo-fmt")) el("byo-fmt").addEventListener("change",function(e){S.byoFmt=e.target.value;});
+  if(el("byo-freq")) el("byo-freq").addEventListener("input",function(e){S.byoFreq=+e.target.value||15;});
+  if(el("byo-units")) el("byo-units").addEventListener("change",function(e){S.byoUnits=e.target.value;});
   if(el("dl-zip")) el("dl-zip").addEventListener("click",downloadZip);
   if(el("copy-cmd")) el("copy-cmd").addEventListener("click",function(){
     navigator.clipboard.writeText(cmdScript());
@@ -318,23 +324,33 @@ function cmdScript(){
   var fm=FORCING_META[S.forcing];
   if(S.forcing==="byo"){
     P("# ---- 4. Forcing: BRING YOUR OWN QPE/QPF");
-    P("# Your product: "+(S.byoPath||"<set path>")+"  (format: "+S.byoFmt+")");
-    P("# Follow BYO_QPE_PROTOCOL.md, then run byo_to_aorc_template.py to bring it");
-    P("# to AORC format before the engine aggregation step.");
+    P("# Your product: "+(S.byoPath||"<set path>")+"  ("+S.byoFmt+", every "+S.byoFreq+" min, "+S.byoUnits+")");
+    P("python engine/forcing/byo/convert.py \\");
+    P("    --in-path "+(S.byoPath||"/path/to/my_qpe")+" --format "+S.byoFmt.split(" ")[0]+" \\");
+    P("    --timestep-min "+S.byoFreq+" --units \""+S.byoUnits+"\"");
+    P("# Then aggregate + merge with AORC met at your product timestep:");
+    P("python engine/forcing/aorc/extract.py --events-csv events.csv --timestep-min "+(60%S.byoFreq===0?S.byoFreq:15));
+    P("python engine/forcing/merge_15min.py --timestep-min "+(60%S.byoFreq===0?S.byoFreq:15));
+  } else if(fm.timestep_min===60){
+    var prodkey = S.forcing==="radar_60min"?"radar_1h":(S.forcing==="pass1_60min"?"pass1":"pass2");
+    P("# ---- 4. MRMS hourly product ("+fm.product+"), direct from AWS");
+    P("python engine/forcing/mrms/extract_hourly.py --events-csv events.csv --product "+prodkey+" --window-days 6 --centroid peak");
+    P("");
+    P("# ---- 5. AORC meteorology at the hourly step (30-day hourly warmup included)");
+    P("python engine/forcing/aorc/extract.py --events-csv events.csv --timestep-min 60 --window-days 6 --centroid peak");
+    P("");
+    P("# ---- 6. Merge: P from MRMS, T and PET from AORC");
+    P("python engine/forcing/merge_15min.py --timestep-min 60");
   } else {
-    P("# ---- 4. MRMS precipitation ("+fm.product+")");
-    if(!fm.ready){
-      P("# NOTE: this cadence/product is SPEC ONLY today. engine/forcing/mrms will be");
-      P("# adjusted to user needs. Data source: "+MRMS_BUCKET+"#"+fm.product+"/");
-    }
-    P("python engine/forcing/mrms/extract.py --events-csv events.csv --window-days 6 --centroid peak");
+    P("# ---- 4. MRMS precipitation ("+fm.product+", "+fm.timestep_min+"-minute accumulation)");
+    P("python engine/forcing/mrms/extract.py --events-csv events.csv --timestep-min "+fm.timestep_min+" --window-days 6 --centroid peak");
     P("python engine/forcing/mrms/merge.py");
     P("");
-    P("# ---- 5. AORC meteorology (hourly warmup + 15-min event window)");
-    P("python engine/forcing/aorc/extract.py --events-csv events.csv --window-days 6 --centroid peak --antecedent-days 30");
+    P("# ---- 5. AORC meteorology ("+fm.timestep_min+"-minute, 30-day hourly warmup included)");
+    P("python engine/forcing/aorc/extract.py --events-csv events.csv --timestep-min "+fm.timestep_min+" --window-days 6 --centroid peak");
     P("");
-    P("# ---- 6. Merge: P from MRMS, T and PET from AORC (per-event, per-catchment)");
-    P("python engine/forcing/merge_15min.py");
+    P("# ---- 6. Merge: P from MRMS, T and PET from AORC");
+    P("python engine/forcing/merge_15min.py --timestep-min "+fm.timestep_min);
   }
   P("");
   P("# Output: forcing_15min.nc next to your events CSV (see FORCING.json for the spec).");
@@ -369,7 +385,7 @@ function forcingJson(){
       met_source:"AORC (hourly, disaggregated to the precipitation timestep)",
       window_days:6, centroid:"peak", antecedent_days:30,
       aws_registry:MRMS_REGISTRY, aws_bucket:MRMS_BUCKET,
-      byo: S.forcing==="byo"?{path:S.byoPath||null,format:S.byoFmt}:null
+      byo: S.forcing==="byo"?{path:S.byoPath||null,format:S.byoFmt,timestep_min:S.byoFreq,units:S.byoUnits}:null
     },
     output:"forcing_15min.nc: P (MRMS), T (AORC), PET (AORC), ragged per-event NextGen catchments"
   },null,2);
@@ -403,15 +419,10 @@ function runReadme(){
   "    P from MRMS, T and PET from AORC, written as ragged NetCDF\n"+
   "    (forcing_15min.nc). Both extractions must use the same WINDOW_DAYS and\n"+
   "    CENTROID or the merge will refuse.\n\n";
-  if(!fm.ready && S.forcing!=="byo"){
-    s+="IMPORTANT: your selected cadence/product ("+fm.label+") is not fully wired\n"+
-    "into the engine yet. FORCING.json carries the exact specification (product\n"+
-    "path "+fm.product+" on noaa-mrms-pds); the MRMS extraction will be adjusted\n"+
-    "to user needs.\n\n";
-  }
   if(S.forcing==="byo"){
-    s+="BRING YOUR OWN QPE/QPF: follow BYO_QPE_PROTOCOL.md and adapt\n"+
-    "byo_to_aorc_template.py to convert your product to AORC format first.\n\n";
+    s+="BRING YOUR OWN QPE/QPF: engine/forcing/byo/convert.py converts your\n"+
+    "product ("+S.byoFmt+", every "+S.byoFreq+" min, "+S.byoUnits+") to the AORC convention;\n"+
+    "BYO_QPE_PROTOCOL.md documents the convention in detail.\n\n";
   }
   s+="All timestamps are UTC. Dataset and interface are experimental.\n";
   return s;
@@ -420,7 +431,8 @@ function byoProtocol(){
   return "Bring your own QPE/QPF: AORC-format protocol\n"+
   "============================================\n\n"+
   "Goal: convert your product ("+S.byoFmt+") to the AORC convention so the RUNOFF\n"+
-  "engine can treat it exactly like MRMS precipitation.\n\n"+
+  "engine can treat it exactly like MRMS precipitation.\n"+
+  "Declared: every "+S.byoFreq+" minutes, units "+S.byoUnits+".\n\n"+
   "Target convention (per timestep)\n"+
   "  variable   APCP_surface\n"+
   "  units      kg m-2 per timestep (1 kg m-2 = 1 mm of water)\n"+
@@ -455,8 +467,8 @@ function byoTemplate(){
   'import xarray as xr\n\n'+
   'IN_PATH  = r"'+(S.byoPath||"/path/to/my_qpe")+'"\n'+
   'OUT_NC   = "my_qpe_aorc_format.nc"\n'+
-  'TIMESTEP_MIN = 15            # your product timestep, minutes\n'+
-  'IS_RATE_MM_PER_H = False     # True if the product is a rate, not a depth\n\n\n'+
+  'TIMESTEP_MIN = '+S.byoFreq+'            # your product timestep, minutes\n'+
+  'IS_RATE_MM_PER_H = '+(S.byoUnits.indexOf('/h')>=0?'True':'False')+'     # from your declared units: '+S.byoUnits+'\n\n\n'+
   'def read_my_product(path):\n'+
   '    """Return an xarray.DataArray precip(time, latitude, longitude).\n\n'+
   '    Examples:\n'+

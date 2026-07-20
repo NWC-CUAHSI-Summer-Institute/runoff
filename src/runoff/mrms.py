@@ -1215,10 +1215,19 @@ def storm_catchment_rate_2min(
     return pd.DataFrame(rate, index=times, columns=cats), None
 
 
+def to_depth(rate2min: pd.DataFrame, timestep_min: int = 15) -> pd.DataFrame:
+    """Convert a 2-min precip rate series (mm/h) to depth per timestep (mm).
+
+    Works for any timestep that is a multiple of the 2-min scan interval
+    (10, 15, 30, 60, ...): mean rate over the window x window length in hours.
+    """
+    rate = rate2min.resample(f'{timestep_min}min', label='left', closed='left').mean()
+    return rate * (timestep_min / 60.0)
+
+
 def to_depth_15(rate2min: pd.DataFrame) -> pd.DataFrame:
     """Convert a 2-min precip rate series to 15-min depth."""
-    rate15 = rate2min.resample('15min', label='left', closed='left').mean()
-    return rate15 * 0.25
+    return to_depth(rate2min, 15)
 
 
 def extract_all(
@@ -1229,8 +1238,14 @@ def extract_all(
     out_nc: Path,
     max_steps: int = 577,
     zero_precip_threshold_mm: float = 1.0,
+    timestep_min: int = 15,
 ) -> None:
-    """Extract per-event 15-min MRMS catchment precipitation to out_nc."""
+    """Extract per-event sub-hourly MRMS catchment precipitation to out_nc.
+
+    timestep_min sets the output accumulation step (10, 15, 30, 60 ...);
+    the 2-min scans in the shards are averaged over each step and converted
+    to depth. Default 15 reproduces the original behavior.
+    """
     ds = open_shards(shard_dir)
     cats_by_event = event_catchment_windows.groupby('storm_index')['divide_id'].apply(
         list,
@@ -1298,7 +1313,7 @@ def extract_all(
                 },
             )
             continue
-        depth15 = to_depth_15(depth15).iloc[:max_steps]
+        depth15 = to_depth(depth15, timestep_min).iloc[:max_steps]
         vals = depth15.values.astype('float32')
         records.append(
             {
@@ -1399,7 +1414,7 @@ def extract_all(
         complevel=4,
         chunksizes=(min(total_entries, 4096), max_steps),
     )
-    v_p.units = 'mm [15 min]-1'
+    v_p.units = f'mm [{timestep_min} min]-1'
     v_p.long_name = 'MRMS precipitation depth'
 
     # Write per event so no array spanning all events is ever held in memory.
@@ -1457,7 +1472,7 @@ def merge_parts(part_paths: Iterable[Path], out_nc: Path) -> None:
         complevel=4,
         chunksizes=(min(total_entries, 4096), max_steps),
     )
-    v_p.units = 'mm [15 min]-1'
+    v_p.units = getattr(ncs[0].variables['P'], 'units', 'mm [15 min]-1')
     v_p.long_name = 'MRMS precipitation depth'
 
     e_off, p_off = 0, 0
