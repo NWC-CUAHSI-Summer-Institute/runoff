@@ -67,6 +67,10 @@ WINDOW_DAYS = 6.0
 #   'peak' (Recommended) -- window centered on the event's reported peak time.
 CENTROID = 'peak'
 
+# Output accumulation timestep in minutes (10, 15, 30 or 60). The 2-min scans
+# are averaged over each step and converted to depth. 15 = original behavior.
+TIMESTEP_MIN = 15
+
 # Caching
 #   True -- ignore cached per-VPU windows/timesteps and rebuild from scratch.
 #   Doesn't touch the hydrofabric or crosswalk caches (static geometry,
@@ -103,6 +107,13 @@ def parse_args():
     p.add_argument('--window-days', type=float, default=WINDOW_DAYS)
     p.add_argument('--centroid', choices=['midpoint', 'peak'], default=CENTROID)
     p.add_argument('--fresh-start', action='store_true', default=FRESH_START)
+    p.add_argument(
+        '--timestep-min',
+        type=int,
+        default=TIMESTEP_MIN,
+        choices=[10, 15, 30, 60],
+        help='output accumulation step in minutes (default: %(default)s)',
+    )
     return p.parse_args()
 
 
@@ -119,6 +130,9 @@ def mrms_extract():
     window_days = args.window_days
     centroid = args.centroid
     fresh_start = args.fresh_start
+    timestep_min = args.timestep_min
+    if timestep_min != 15 and out_nc == OUT_NC:
+        out_nc = CACHE_DIR / f'mrms_{timestep_min}min.nc'
 
     catchments_master, network, flowpaths, nexus = load_hydrofabric(cache_dir)
     log.info('hydrofabric: %d catchments', len(catchments_master))
@@ -144,9 +158,9 @@ def mrms_extract():
     crosswalk = build_crosswalk(catchments_master, cache_dir, vpus=vpus)
     log.info('crosswalk: %d MRMS cells', len(crosswalk))
 
-    # 15-min steps in a window_days-wide window, + small buffer for the
-    # outward 15-min-grid rounding in build_manifest.
-    max_steps = int(round(window_days * 24 * 60 / 15)) + 1
+    # sub-hourly steps in a window_days-wide window, + small buffer for the
+    # outward grid rounding in build_manifest.
+    max_steps = int(round(window_days * 24 * 60 / timestep_min)) + 1
 
     part_ncs = []
     for vpu in vpus:
@@ -164,7 +178,7 @@ def mrms_extract():
                 shutil.rmtree(vpu_dir)
             log.info('FRESH_START: cleared manifest cache and %s', vpu_dir)
 
-        part_nc = vpu_dir / 'mrms_15min_part.nc'
+        part_nc = vpu_dir / f'mrms_{timestep_min}min_part.nc'
         if not fresh_start and part_nc.exists():
             log.info(
                 '%s already exists -- skipping manifest/download/extract for VPU %s '
@@ -245,6 +259,7 @@ def mrms_extract():
             vpu_dir / 'shards',
             part_nc,
             max_steps=max_steps,
+            timestep_min=timestep_min,
         )
         part_ncs.append(part_nc)
 
