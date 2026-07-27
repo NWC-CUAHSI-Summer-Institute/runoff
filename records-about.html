@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About the flash flood records - RUNOFF</title>
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="name">RUN<b>OFF</b></span>
+    <span class="sub"><b>R</b>adar and <b>U</b>SGS <b>N</b>etworked<br><b>O</b>bservations of <b>F</b>lash <b>F</b>loods</span>
+  </a>
+  <div class="partners">
+    <img src="assets/logos/ciroh.png" alt="CIROH" onerror="this.outerHTML='<span class=p>CIROH</span>'">
+    <img src="assets/logos/cuahsi.png" alt="CUAHSI" onerror="this.outerHTML='<span class=p>CUAHSI</span>'">
+    <img src="assets/logos/si2026.png" alt="Summer Institute 2026" onerror="this.outerHTML='<span class=p>Summer Institute 2026</span>'">
+  </div>
+  <nav class="toplinks">
+    <a href="about.html">About</a>
+    <a href="records.html">Flash Flood Records</a>
+    <a class="cta" href="access.html">Access Dataset</a>
+  </nav>
+</header>
+
+<div class="page">
+  <h1>About <b>the flash flood records</b></h1>
+  <p class="sub">What the <a href="records.html">records map</a> shows, where the numbers come from, and how to read them
+  when weighing where new weather radars would matter most.</p>
+
+  <div class="section">
+    <h2>What this site shows</h2>
+    <p>Every point on this site traces back to an official flash flood report filed by a
+    local National Weather Service office. We collected eleven years of these reports,
+    2015 through 2025, for the lower 48 states and DC, kept only floods caused by
+    weather, and added them up two ways: by county, which is how the reports are filed,
+    and by HUC8 watershed, which is how water actually moves. The result is a picture of
+    where flash flooding keeps happening, who it hurts, and what it costs.</p>
+    <p>Radar coverage is not uniform across the country. In places where the nearest
+    radar beam sits high above the ground, rainfall estimates are less certain and
+    warnings lean on less information. A map of repeated flash flood impacts is one of
+    the inputs a decision maker needs when asking where an additional radar, or a gap
+    filling radar, would pay for itself in warnings, property, and lives.</p>
+  </div>
+
+  <div class="section">
+    <h2>Episodes and events, in plain language</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>Storm episode</h3>
+        <p>One whole storm system: a tropical storm, a line of severe thunderstorms, a
+        slow frontal system. The NWS gives it a single episode number, and it can span
+        several days and many counties. Counting episodes answers: how many distinct
+        storms caused flash flooding here?</p>
+      </div>
+      <div class="card">
+        <h3>Flash flood event</h3>
+        <p>One flash flood report for one place, filed as part of an episode. A single
+        episode often produces several events. Counting events answers: how many separate
+        flash floods were recorded here? Fatalities, injuries, and damage are attached to
+        events, so we sum them from the event records.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px">Example: a squall line crosses a metro area overnight. That
+    is one episode. It drops flash floods in four counties, two of them twice. That is six
+    events. The county view credits each county with its own events; all of them share the
+    same episode.</p>
+  </div>
+
+  <div class="section">
+    <h2>What counts as weather-caused</h2>
+    <p>The Storm Events Database records a cause for each flash flood. We keep the causes
+    that come from weather, at any time of year: heavy rain (42,256 events), heavy rain
+    with a tropical system (1,519), heavy rain on a burn scar (604), heavy rain with
+    snowmelt (155), and ice jams (38). We removed 94 reports whose cause was a dam or
+    levee failure, because those floods say nothing about where better rainfall
+    observation would help.</p>
+  </div>
+
+  <div class="section">
+    <h2>The two map scales</h2>
+    <p>Counties are the reporting unit of record, so the county view is the most faithful
+    to the database and the most familiar to local officials. Watersheds are the unit
+    floods obey: rain that falls in one county can flood the next one downstream. The
+    HUC8 view assigns each event to the watershed containing the reported start point of
+    the flooding, using the USGS Watershed Boundary Dataset. HUC8 basins are typically a
+    few thousand square kilometers, the scale of a large river basin section.</p>
+  </div>
+
+  <div class="section">
+    <h2>Source data and preparation</h2>
+    <table class="data">
+      <tr><th>Item</th><th>Detail</th></tr>
+      <tr><td>Source</td><td>NOAA NCEI Storm Events Database, annual details files, 2015 through 2025</td></tr>
+      <tr><td>Selection</td><td>EVENT_TYPE equals Flash Flood, county-type reports, lower 48 states and DC</td></tr>
+      <tr><td>Cause filter</td><td>Dam and levee failures removed (94 reports); all weather causes kept</td></tr>
+      <tr><td>Episodes and events</td><td>Counted from EPISODE_ID and EVENT_ID; episode counts are distinct storms touching that county or watershed</td></tr>
+      <tr><td>Fatalities and injuries</td><td>Direct plus indirect, summed from event records</td></tr>
+      <tr><td>Damage</td><td>Property and crop damage parsed from NWS entries such as 10.00K or 2.5M into dollars</td></tr>
+      <tr><td>County geometry</td><td>NWS AWIPS county shapefile, dissolved to one shape per county FIPS</td></tr>
+      <tr><td>Watershed geometry</td><td>USGS Watershed Boundary Dataset, HUC8, CONUS</td></tr>
+      <tr><td>Result</td><td>44,572 events in 12,184 episodes; 1,044 fatalities; 291 injuries; $61.2B property and $0.8B crop damage</td></tr>
+    </table>
+    <p style="margin-top:12px">The scripts that rebuild every number on the records map from the
+    raw NCEI files are in <code>engine/records</code> of the RUNOFF repository.</p>
+  </div>
+
+  <div class="section">
+    <h2>Reading the numbers with care</h2>
+    <p>Damage figures are estimates made by forecasters shortly after each event, not
+    audited losses, and large events dominate the totals. Injuries from flash floods are
+    known to be under-reported. One storm episode can touch several counties, so summing
+    episode counts across counties would overcount distinct storms; the totals panel on
+    the map counts each episode once. Reporting practices also vary somewhat between
+    offices and improve over time, so treat small differences between neighboring places
+    as noise and large, repeated patterns as signal.</p>
+  </div>
+
+  <div class="section">
+    <h2>Definitions source</h2>
+    <p>Episode and event wording follows the NCEI Storm Events bulk CSV format
+    documentation: an episode is an entire storm system and can contain many different
+    types of events; an event is an individual type of storm event within an episode.
+    See the <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">
+    Storm Events Database</a> for the database itself and its documentation page for the
+    format description.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="wordmark">RUN<b>OFF</b></div>
+      <p>Flash flood impact records from the NOAA NCEI Storm Events Database, part of the
+      RUNOFF flash flood benchmark dataset. Built at the CUAHSI and NOAA National Water
+      Center Summer Institute 2026 by Team "Don't Runoff!".</p>
+    </div>
+    <div>
+      <h4>Dataset</h4>
+      <a href="about.html">About RUNOFF</a>
+      <a href="access.html">Access Data</a>
+      <a href="records.html">Flash Flood Records</a>
+    </div>
+    <div>
+      <h4>Community</h4>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute" target="_blank" rel="noopener">Summer Institute GitHub</a>
+      <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NOAA Storm Events Database</a>
+      <a href="https://ciroh.ua.edu/" target="_blank" rel="noopener">CIROH</a>
+      <a href="https://www.cuahsi.org/" target="_blank" rel="noopener">CUAHSI</a>
+    </div>
+  </div>
+  <div class="credits">
+    Impact figures are National Weather Service estimates and may be revised. This site is
+    provided for research and planning discussion only. This work was supported by the
+    Cooperative Institute for Research to Operations in Hydrology (CIROH) under award
+    NA22NWS4320003 from the NOAA Cooperative Institute Program. Findings do not
+    necessarily reflect the views of NOAA.
+  </div>
+</footer>
+
+</body>
+</html>

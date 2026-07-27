@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash Flood Records - RUNOFF</title>
+<meta name="description" content="Interactive map of weather-caused flash floods across the United States, 2015 to 2025: storm episodes, individual events, fatalities, injuries, and damage by county and by HUC8 watershed. Built from the NOAA Storm Events Database.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+.wrap{display:grid;grid-template-columns:352px 1fr;gap:0;border-bottom:1px solid var(--line)}
+.rail{border-right:1px solid var(--line);background:var(--bg2);
+      height:calc(100vh - 96px);overflow-y:auto}
+.rail .body{padding:16px 18px 26px}
+#map{height:calc(100vh - 96px);background:#0b0e13}
+.maparea{position:relative}
+.rail select{width:100%;padding:8px 9px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:6px;color:var(--text);font:13.5px "Segoe UI",sans-serif}
+.sumline{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);
+  padding:6px 0;border-bottom:1px solid var(--line)}
+.sumline b{color:var(--text)}
+.i{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--gold);
+   color:var(--gold);font-size:10px;font-weight:700;align-items:center;justify-content:center;
+   cursor:help;position:relative;font-family:Georgia,serif;vertical-align:1px}
+.i:hover::after{content:attr(data-tip);position:absolute;bottom:130%;left:-8px;
+  width:262px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
+  font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;z-index:3000;text-align:left}
+.defrow{display:flex;gap:8px;align-items:flex-start;font-size:12.3px;color:var(--muted);
+  margin:7px 0 0;line-height:1.5}
+.defrow b{color:var(--text)}
+@media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:54vh}#map{height:58vh}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="name">RUN<b>OFF</b></span>
+    <span class="sub"><b>R</b>adar and <b>U</b>SGS <b>N</b>etworked<br><b>O</b>bservations of <b>F</b>lash <b>F</b>loods</span>
+  </a>
+  <div class="partners">
+    <img src="assets/logos/ciroh.png" alt="CIROH" onerror="this.outerHTML='<span class=p>CIROH</span>'">
+    <img src="assets/logos/cuahsi.png" alt="CUAHSI" onerror="this.outerHTML='<span class=p>CUAHSI</span>'">
+    <img src="assets/logos/si2026.png" alt="Summer Institute 2026" onerror="this.outerHTML='<span class=p>Summer Institute 2026</span>'">
+  </div>
+  <nav class="toplinks">
+    <a href="about.html">About</a>
+    <a href="records.html">Flash Flood Records</a>
+    <a class="cta" href="access.html">Access Dataset</a>
+  </nav>
+</header>
+
+<div class="introband">
+  <div><b>12,184</b><span>storm episodes</span></div>
+  <div><b>44,572</b><span>flash flood events</span></div>
+  <div><b>1,044</b><span>fatalities</span></div>
+  <div><b>291</b><span>injuries</span></div>
+  <div><b>$61.9B</b><span>reported damage</span></div>
+  <div><b>2015 to 2025</b><span>weather-caused, CONUS</span></div>
+</div>
+
+<div class="wrap">
+  <aside class="rail">
+    <div class="body">
+
+      <div class="railtitle">Map scale
+        <span class="i" data-tip="Counties are how the National Weather Service files its reports, so the county view is the most direct look at the official records. HUC8 watersheds are standard river-basin units used in hydrology. Flash floods follow watersheds rather than county lines, so the watershed view groups reports by the basin where the flooding began.">i</span>
+      </div>
+      <div class="seg" id="seg-scale">
+        <button class="on" data-v="county">Counties</button>
+        <button data-v="huc8">HUC8 watersheds</button>
+      </div>
+
+      <div class="railtitle">Count flash floods by</div>
+      <div class="seg" id="seg-display">
+        <button class="on" data-v="ep">Storm episodes</button>
+        <button data-v="ev">Individual events</button>
+      </div>
+      <div class="defrow">
+        <span class="i" data-tip="In the NOAA Storm Events Database an episode is an entire storm system, for example a tropical storm, a line of severe thunderstorms, or a large frontal passage. One episode can produce many different events over several counties. Counting episodes answers: how many distinct storms caused flash flooding here?">i</span>
+        <span><b>Episode:</b> one whole storm system, such as a tropical storm or a line of thunderstorms. A single episode can flood many counties.</span>
+      </div>
+      <div class="defrow">
+        <span class="i" data-tip="An event is one flash flood report for one place and time, filed by the local National Weather Service office as part of an episode. A single storm episode often produces several flash flood events. Counting events answers: how many separate flash floods were recorded here?">i</span>
+        <span><b>Event:</b> one flash flood report in one place. Several events can belong to the same episode.</span>
+      </div>
+
+      <div class="railtitle">Color the map by
+        <span class="i" data-tip="Frequency uses your episode or event choice above. Damage combines property and crop damage as estimated by the National Weather Service at the time of the event. These are approximate figures, best used to compare places rather than as exact losses.">i</span>
+      </div>
+      <select id="sel-color">
+        <option value="freq" selected>Frequency (episodes or events)</option>
+        <option value="d">Fatalities</option>
+        <option value="i">Injuries</option>
+        <option value="dmg">Damage (property + crop)</option>
+      </select>
+
+      <div class="railtitle">What the colors mean</div>
+      <div class="raillegend" id="legend"></div>
+
+      <div class="railtitle">Time window</div>
+      <div class="yearrow">
+        <select id="y-from"></select><span>to</span><select id="y-to"></select>
+      </div>
+      <span class="quick" id="y-all">Show the full record (2015 to 2025)</span>
+
+      <div class="railtitle">Totals for selected years</div>
+      <div class="sumline"><span>Storm episodes</span><b id="t-ep"></b></div>
+      <div class="sumline"><span>Flash flood events</span><b id="t-ev"></b></div>
+      <div class="sumline"><span>Fatalities</span><b id="t-d"></b></div>
+      <div class="sumline"><span>Injuries</span><b id="t-i"></b></div>
+      <div class="sumline"><span>Reported damage</span><b id="t-dmg"></b></div>
+
+      <div class="filternote">
+        <b>What is included.</b> Weather-caused flash floods only: heavy rain, tropical
+        systems, rain on burn scars, rain with snowmelt, and ice jams. Reports caused by
+        dam or levee failures are removed. Click any county or watershed for its impact
+        record. Source: NOAA NCEI Storm Events Database, 2015 to 2025, lower 48 states
+        and DC. Read <a href="records-about.html">how these records were built</a>.
+      </div>
+
+    </div>
+  </aside>
+
+  <div class="maparea">
+    <div id="map"></div>
+    <div class="hoverbox" id="hoverbox"></div>
+    <div class="basebox" id="basebox">
+      <label><input type="radio" name="base" value="dark" checked> Dark map</label>
+      <label><input type="radio" name="base" value="light"> Light map</label>
+      <label><input type="radio" name="base" value="sat"> Satellite</label>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="wordmark">RUN<b>OFF</b></div>
+      <p>Flash flood impact records from the NOAA NCEI Storm Events Database, mapped by
+      county and by HUC8 watershed as part of the RUNOFF flash flood benchmark dataset.
+      Built at the CUAHSI and NOAA National Water Center Summer Institute 2026 by Team
+      "Don't Runoff!".</p>
+    </div>
+    <div>
+      <h4>Dataset</h4>
+      <a href="about.html">About RUNOFF</a>
+      <a href="access.html">Access Data</a>
+      <a href="records.html">Flash Flood Records</a>
+      <a href="records-about.html">About the records</a>
+    </div>
+    <div>
+      <h4>Community</h4>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute" target="_blank" rel="noopener">Summer Institute GitHub</a>
+      <a href="https://www.ncdc.noaa.gov/stormevents/" target="_blank" rel="noopener">NOAA Storm Events Database</a>
+      <a href="https://ciroh.ua.edu/" target="_blank" rel="noopener">CIROH</a>
+      <a href="https://www.cuahsi.org/" target="_blank" rel="noopener">CUAHSI</a>
+    </div>
+  </div>
+  <div class="credits">
+    Impact figures are National Weather Service estimates and may be revised. This site is
+    provided for research and planning discussion only. This work was supported by the
+    Cooperative Institute for Research to Operations in Hydrology (CIROH) under award
+    NA22NWS4320003 from the NOAA Cooperative Institute Program. Findings do not
+    necessarily reflect the views of NOAA.
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="assets/data/globals.js"></script>
+<script src="assets/data/county_stats.js"></script>
+<script src="assets/data/huc8_stats.js"></script>
+<script src="assets/data/states_geo.js"></script>
+<script src="assets/data/counties_geo.js"></script>
+<script src="assets/data/huc8.js"></script>
+<script src="assets/js/records.js"></script>
+</body>
+</html>
