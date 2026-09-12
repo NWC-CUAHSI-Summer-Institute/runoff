@@ -27,6 +27,9 @@ Outputs
   data/episodes/episode_lsrs.csv        LSR rows matched to episodes
   assets/data/episodes.js               site payload (var EPCAT)
   assets/data/episode_points.js         site payload (var EPPTS)
+  assets/data/rep/<id>.json             narratives per episode: the Storm Events
+                                        episode narrative, one event narrative per
+                                        report, one remark per LSR (fetched on click)
 
 Episode/LSR matching: an LSR belongs to an episode when its type is in
 --lsr-types, its time falls in [episode start - 3 h, episode end + 6 h], and
@@ -70,7 +73,20 @@ USE = ["EPISODE_ID","EVENT_ID","STATE","STATE_FIPS","EVENT_TYPE","CZ_TYPE",
        "BEGIN_TIME","END_YEARMONTH","END_DAY","END_TIME","DEATHS_DIRECT",
        "DEATHS_INDIRECT","INJURIES_DIRECT","INJURIES_INDIRECT",
        "DAMAGE_PROPERTY","DAMAGE_CROPS","FLOOD_CAUSE",
-       "BEGIN_LAT","BEGIN_LON","END_LAT","END_LON"]
+       "BEGIN_LAT","BEGIN_LON","END_LAT","END_LON",
+       "EVENT_NARRATIVE","EPISODE_NARRATIVE"]
+
+
+def clean_text(s) -> str:
+    """One-line narrative text.
+
+    NaN to empty, whitespace collapsed, and the IEM comma substitution inside
+    LSR remarks ('_ ' for ', ') restored.
+    """
+    if s is None or (isinstance(s, float) and np.isnan(s)):
+        return ""
+    t = re.sub(r"\s+", " ", str(s)).strip()
+    return re.sub(r"_(?=\s|$)", ",", t)
 
 
 def dollars(s) -> float:
@@ -225,7 +241,7 @@ def main() -> None:
 
     # ---------------- per-episode assembly ----------------
     vvals = lsr["valid"].values if lsr is not None else None
-    episodes, points, lsr_rows_out = [], {}, []
+    episodes, points, reports, lsr_rows_out = [], {}, {}, []
     for epid, g in ff.groupby("EPISODE_ID"):
         epid = int(epid)
         lats = pd.concat([g.BEGIN_LAT, g.END_LAT]).dropna()
@@ -253,29 +269,40 @@ def main() -> None:
         ep["t0"] = ep["t0dt"].strftime("%Y-%m-%d %H")
         ep["t1"] = ep["t1dt"].strftime("%Y-%m-%d %H")
 
-        ev_pts = []
+        narrs = g.EPISODE_NARRATIVE.dropna()
+        ep["narr"] = clean_text(narrs.iloc[0]) if len(narrs) else ""
+
+        ev_pts, ev_rep = [], []
         for _, r in g.iterrows():
             if pd.isna(r.BEGIN_LAT) or pd.isna(r.BEGIN_LON):
                 continue
-            ev_pts.append([round(float(r.BEGIN_LAT), 3), round(float(r.BEGIN_LON), 3),
-                           r.begin_utc.strftime("%Y-%m-%d %H:%M"),
-                           int(r.deaths), int(round(r.dmg))])
-        lsr_pts = []
+            base = [round(float(r.BEGIN_LAT), 3), round(float(r.BEGIN_LON), 3),
+                    r.begin_utc.strftime("%Y-%m-%d %H:%M"),
+                    int(r.deaths), int(round(r.dmg))]
+            ev_pts.append(base)
+            ev_rep.append(base + [clean_text(r.EVENT_NARRATIVE),
+                                  clean_text(r.CZ_NAME).title(), clean_text(r.stab)])
+        lsr_pts, lsr_rep = [], []
         if lsr is not None:
             idx = match_lsrs(ep, lsr, vvals)
             ep["nlsr"] = len(idx)
             for i in idx:
                 rr = lsr.loc[i]
-                lsr_pts.append([round(float(rr.lat), 3), round(float(rr.lon), 3),
-                                rr.valid.strftime("%Y-%m-%d %H:%M"),
-                                rr.TYPETEXT, str(rr.SOURCE) if pd.notna(rr.SOURCE) else ""])
+                base = [round(float(rr.lat), 3), round(float(rr.lon), 3),
+                        rr.valid.strftime("%Y-%m-%d %H:%M"),
+                        rr.TYPETEXT, str(rr.SOURCE) if pd.notna(rr.SOURCE) else ""]
+                lsr_pts.append(base)
+                lsr_rep.append(base + [clean_text(rr.REMARK), clean_text(rr.CITY).title(),
+                                       clean_text(rr.COUNTY).title()])
                 lsr_rows_out.append({
                     "episode_id": epid, "valid_utc": rr.valid.strftime("%Y-%m-%d %H:%M"),
                     "lat": rr.lat, "lon": rr.lon, "typetext": rr.TYPETEXT,
                     "source": rr.SOURCE, "wfo": rr.WFO, "county_fips": rr.fips,
-                    "city": rr.CITY, "remark": rr.REMARK})
+                    "city": rr.CITY, "county": rr.COUNTY,
+                    "narrative": clean_text(rr.REMARK)})
         else:
             ep["nlsr"] = -1
+        reports[str(epid)] = {"narr": ep["narr"], "ev": ev_rep, "lsr": lsr_rep}
 
         # MRMS stats, if mrms_stats.py already ran for this episode
         ms = args.out / str(epid) / "mrms_summary.json"
@@ -313,13 +340,16 @@ def main() -> None:
         "max_roll_24h_mm": e["acc24"], "max_roll_72h_mm": e["acc72"],
         "max_ari_years": e["ari"], "max_ari_duration": e["aridur"],
         "mrms_product": e["product"],
+        "episode_narrative": e["narr"],
     } for e in episodes]).to_csv(args.out / "episodes.csv", index=False)
 
     ff_out = ff[["EPISODE_ID","EVENT_ID","stab","fips","begin_utc","end_utc",
-                 "BEGIN_LAT","BEGIN_LON","deaths","inj","dmg","cause","CZ_NAME"]].copy()
+                 "BEGIN_LAT","BEGIN_LON","deaths","inj","dmg","cause","CZ_NAME",
+                 "EVENT_NARRATIVE"]].copy()
     ff_out.columns = ["episode_id","event_id","state","county_fips","begin_utc",
                       "end_utc","lat","lon","deaths","injuries","damage_usd",
-                      "flood_cause","county_name"]
+                      "flood_cause","county_name","event_narrative"]
+    ff_out["event_narrative"] = ff_out.event_narrative.map(clean_text)
     ff_out.to_csv(args.out / "episode_events.csv", index=False)
     if lsr_rows_out:
         pd.DataFrame(lsr_rows_out).to_csv(args.out / "episode_lsrs.csv", index=False)
@@ -340,6 +370,16 @@ def main() -> None:
     sz1 = (args.site_data / "episodes.js").stat().st_size / 1e6
     sz2 = (args.site_data / "episode_points.js").stat().st_size / 1e6
     print(f"site payloads written: episodes.js {sz1:.2f} MB, episode_points.js {sz2:.2f} MB")
+    # per episode narratives (Storm Events episode and event narratives, LSR remarks),
+    # fetched by episodes.html on click so the map payload stays small
+    rep_dir = args.site_data / "rep"
+    rep_dir.mkdir(parents=True, exist_ok=True)
+    rep_bytes = 0
+    for epid, rep in reports.items():
+        p = rep_dir / f"{epid}.json"
+        p.write_text(json.dumps(rep, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+        rep_bytes += p.stat().st_size
+    print(f"narratives written: {len(reports):,} files under assets/data/rep, {rep_bytes / 1e6:.1f} MB")
     # merge the precomputed MRMS statistics (assets/data/ep/*.json) into the payload
     try:
         import sys

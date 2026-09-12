@@ -126,6 +126,12 @@ per episode JSON.
     assets/data/ep/<id>.json             per episode statistics (published, fetched on click)
     assets/data/episodes.js              site payload, var EPCAT
     assets/data/episode_points.js        site payload, var EPPTS
+    assets/data/rep/<id>.json            narratives per episode (fetched on click): the NWS
+                                         episode narrative, the event narrative of every
+                                         Storm Events report, the remark of every LSR;
+                                         the same text is in episodes.csv (episode_narrative),
+                                         episode_events.csv (event_narrative) and
+                                         episode_lsrs.csv (narrative)
 
 ### Site payload format (consumed by assets/js/episodes.js)
 

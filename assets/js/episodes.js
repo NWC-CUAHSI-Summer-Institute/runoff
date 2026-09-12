@@ -368,9 +368,9 @@ function renderLegend(){
 }
 
 /* ---------------- selection ---------------- */
-var SEL=null, SELJ=null, SELPTS=null, HUCLAYERS={}, JCACHE={};
+var SEL=null, SELJ=null, SELPTS=null, SELREP=null, HUCLAYERS={}, JCACHE={}, RCACHE={};
 function clearSelection(){
-  SEL=null; SELJ=null; SELPTS=null; HUCLAYERS={};
+  SEL=null; SELJ=null; SELPTS=null; SELREP=null; HUCLAYERS={};
   hucG.clearLayers(); ctyG.clearLayers(); evG.clearLayers(); lsrG.clearLayers();
   el("detail").hidden=true;
   document.querySelectorAll(".eprow.on").forEach(function(r){r.classList.remove("on");});
@@ -386,30 +386,53 @@ function select(e,row){
     ctyG.addLayer(L.geoJSON({type:"FeatureCollection",features:feats},{pane:"ctypane",interactive:false,
       style:{color:"#f2b705",weight:1.4,dashArray:"4 3",fill:false,opacity:.9}}));
   }
-  /* points */
+  /* points: from the map payload now, redrawn with narratives once rep/<id>.json is in */
   var pts=HAVE_PTS?(EPPTS[String(e.id)]||EPPTS[e.id]||null):null;
   SELPTS=pts;
-  if(pts){
-    (pts.ev||[]).forEach(function(p){
-      var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:4,weight:1,
-        color:"#161308",fillOpacity:.95,fillColor:"#f2b705"});
-      m.bindPopup("<b>Storm Events flash flood</b><br>"+p[2]+" UTC"+
-        (p[3]?("<br>Fatalities: "+p[3]):"")+(p[4]?("<br>Damage: "+fmt$(p[4])):""));
-      evG.addLayer(m);
-    });
-    (pts.lsr||[]).forEach(function(p){
-      var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:3.4,weight:1,
-        color:"#0a1220",fillOpacity:.95,fillColor:"#5b8dd9"});
-      m.bindPopup("<b>Local Storm Report: "+esc(p[3]||"FLASH FLOOD")+"</b><br>"+esc(p[2])+" UTC"+
-        (p[4]?("<br>Source: "+esc(p[4])):""));
-      lsrG.addLayer(m);
-    });
-  }
+  drawPoints(pts);
+  loadReports(e);
   /* watersheds, first without statistics, then with them once the JSON is in */
   drawHucs(e,null);
   zoomTo(e,9);
   renderDetail(e,null);
   if(e.has || hasMRMS) loadJson(e);
+}
+/* pts rows: ev [lat,lon,ts,deaths,dmg(,narrative,county,state)]
+             lsr [lat,lon,ts,type,source(,remark,city,county)] */
+function drawPoints(pts){
+  evG.clearLayers(); lsrG.clearLayers();
+  if(!pts) return;
+  (pts.ev||[]).forEach(function(p){
+    var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:4,weight:1,
+      color:"#161308",fillOpacity:.95,fillColor:"#f2b705"});
+    m.bindPopup("<b>Storm Events flash flood</b><br>"+esc(p[2])+" UTC"+
+      (p[6]?("<br>"+esc(p[6])+(p[7]?(", "+esc(p[7])):"")):"")+
+      (p[3]?("<br>Fatalities: "+p[3]):"")+(p[4]?("<br>Damage: "+fmt$(p[4])):"")+
+      (p[5]?("<br><span class='desc'>Description: "+esc(p[5])+"</span>"):""),{maxWidth:360});
+    evG.addLayer(m);
+  });
+  (pts.lsr||[]).forEach(function(p){
+    var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:3.4,weight:1,
+      color:"#0a1220",fillOpacity:.95,fillColor:"#5b8dd9"});
+    m.bindPopup("<b>Local Storm Report: "+esc(p[3]||"FLASH FLOOD")+"</b><br>"+esc(p[2])+" UTC"+
+      (p[6]||p[7]?("<br>"+esc(p[6]||"")+(p[6]&&p[7]?", ":"")+esc(p[7]||"")):"")+
+      (p[4]?("<br>Source: "+esc(p[4])):"")+
+      (p[5]?("<br><span class='desc'>Description: "+esc(p[5])+"</span>"):""),{maxWidth:360});
+    lsrG.addLayer(m);
+  });
+}
+function loadReports(e){
+  if(RCACHE[e.id]!==undefined){ if(RCACHE[e.id]) applyReports(e,RCACHE[e.id]); return; }
+  fetch("assets/data/rep/"+e.id+".json",{cache:"force-cache"}).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status); return r.json();
+  }).then(function(rep){
+    RCACHE[e.id]=rep; if(SEL===e) applyReports(e,rep);
+  }).catch(function(){ RCACHE[e.id]=null; });
+}
+function applyReports(e,rep){
+  SELREP=rep;
+  drawPoints({ev:rep.ev||[],lsr:rep.lsr||[]});
+  renderDetail(e,SELJ);
 }
 function zoomTo(e,maxZoom){
   var b=null;
@@ -529,6 +552,12 @@ function renderDetail(e,j){
     "<div><b>"+e.deaths+" / "+e.inj+"</b><span>fatalities / injuries</span></div>"+
     "<div><b>"+fmt$(e.dmg)+"</b><span>reported damage</span></div></div>";
 
+  if(SELREP&&SELREP.narr){
+    html+="<div class='sec'>Episode narrative <small>NWS, Storm Events Database</small></div>"+
+      "<div class='narr'>"+esc(SELREP.narr)+"</div>"+
+      "<div class='dq'>Each report on the map carries its own description: click a gold Storm Events point or a blue Local Storm Report.</div>";
+  }
+
   if(j&&j.fp&&j.fp.rain){
     var fp=j.fp, rn=fp.rain;
     html+="<div class='sec'>Rainfall over the footprint <small>MRMS QPE, Pass 2</small></div>";
@@ -635,19 +664,24 @@ function statHeader(){
 }
 function downloadPackage(e,pts,j){
   var zip=new JSZip(), dir="episode_"+e.id+"/";
+  var rep=SELREP||null;
   var summary={episode_id:e.id, window_utc:[e.t0,e.t1], duration_h:e.hours, states:e.states,
     n_events:e.nev, n_lsr:(e.nlsr>=0?e.nlsr:null), fatalities:e.deaths,
     injuries:e.inj, damage_usd:e.dmg, county_fips:e.fips, huc8:e.hucs, report_bbox:e.bbox,
     footprint_km2:e.km2,
+    episode_narrative:(rep&&rep.narr)?rep.narr:null,
     mrms:(j&&j.fp)?{qpe:EPCAT.mrms.qpe, ari:EPCAT.mrms.ari, thresholds:THR, footprint:j.fp, counties:j.cty,
       qpe_files:j.qpe, ari_files:j.ari}:null,
     source:"NOAA NCEI Storm Events Database; NWS Local Storm Reports via IEM; MRMS archive via IEM (AWS fallback); FLASH QPE ARI (NSSL); USGS WBD HUC8",
     note:"Event coordinates are NWS report locations, not storm centers. The watershed footprint and the MRMS fields describe where and how hard it rained."};
   zip.file(dir+"episode_summary.json",JSON.stringify(summary,null,2));
-  if(pts&&pts.ev&&pts.ev.length)
-    zip.file(dir+"events.csv",toCsv(["lat","lon","begin_utc","deaths","damage_usd"],pts.ev));
-  if(pts&&pts.lsr&&pts.lsr.length)
-    zip.file(dir+"lsrs.csv",toCsv(["lat","lon","valid_utc","typetext","source"],pts.lsr));
+  /* with narratives when rep/<id>.json was loaded, plain rows otherwise */
+  var evRows=(rep&&rep.ev&&rep.ev.length)?rep.ev:((pts&&pts.ev)||[]);
+  var lsrRows=(rep&&rep.lsr&&rep.lsr.length)?rep.lsr:((pts&&pts.lsr)||[]);
+  if(evRows.length)
+    zip.file(dir+"events.csv",toCsv(["lat","lon","begin_utc","deaths","damage_usd","narrative","county","state"],evRows));
+  if(lsrRows.length)
+    zip.file(dir+"lsrs.csv",toCsv(["lat","lon","valid_utc","typetext","source","narrative","city","county"],lsrRows));
   if(j&&j.fp){
     zip.file(dir+"footprint_stats.csv",toCsv(statHeader(),[statRow("footprint_huc8_union","",j.fp),statRow("reporting_counties","",j.cty)]));
     var hrows=(j.huc8||[]).map(function(h){ var r=statRow(h.n,h.h,h); r.splice(3,0,h.huc_km2,h.inter_km2,h.frac,h.nev,h.nlsr); return r; });
@@ -660,9 +694,9 @@ function downloadPackage(e,pts,j){
     "# RUNOFF episode "+e.id+"\n\n"+
     "Weather-caused flash flood episode, "+e.t0+" to "+e.t1+" UTC ("+(e.states||"-")+").\n\n"+
     "Files:\n"+
-    "- episode_summary.json: totals, reporting counties, HUC8 watersheds touched, MRMS footprint statistics\n"+
-    "- events.csv: NOAA Storm Events flash flood reports in this episode\n"+
-    "- lsrs.csv: NWS Local Storm Reports matched to this episode (time window + county footprint)\n"+
+    "- episode_summary.json: totals, reporting counties, HUC8 watersheds touched, the NWS episode narrative, MRMS footprint statistics\n"+
+    "- events.csv: NOAA Storm Events flash flood reports in this episode, with the NWS event narrative\n"+
+    "- lsrs.csv: NWS Local Storm Reports matched to this episode (time window + county footprint), with the report remark as narrative\n"+
     "- footprint_stats.csv: MRMS statistics for the watershed union and for the reporting counties\n"+
     "- huc8_stats.csv: the same statistics per HUC8 watershed, with event and LSR counts\n"+
     "- hourly_footprint.csv: hourly footprint mean and maximum rain and maximum 1 h ARI\n"+
