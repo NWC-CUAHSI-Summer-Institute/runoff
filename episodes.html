@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flash Flood Episodes - RUNOFF general modeling access</title>
+<meta name="description" content="Browse CONUS flash flood episodes from the NOAA Storm Events Database with Local Storm Reports and MRMS rainfall over each episode footprint. Filter by rainfall criteria, impacts, and location; download episode tables for general flash flood modeling. No stream gage required.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/css/site.css">
+<style>
+.wrap{display:grid;grid-template-columns:392px 1fr;gap:0;border-bottom:1px solid var(--line)}
+.rail{border-right:1px solid var(--line);background:var(--bg2);
+      height:calc(100vh - 54px);overflow-y:auto}
+.rail .body{padding:16px 18px 26px}
+#map{height:calc(100vh - 54px);background:#0b0e13}
+.maparea{position:relative}
+.rail select,.rail input[type=number]{width:100%;padding:7px 9px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:6px;color:var(--text);font:13.5px "Segoe UI",sans-serif}
+.rail input[type=range]{width:100%;accent-color:var(--gold)}
+.rail label.f{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  font-size:12.5px;color:var(--muted);margin:12px 0 4px}
+.rail label.f b{color:var(--text)}
+.i{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--gold);
+   color:var(--gold);font-size:10px;font-weight:700;align-items:center;justify-content:center;
+   cursor:help;position:relative;font-family:Georgia,serif;vertical-align:1px}
+.i:hover::after{content:attr(data-tip);position:absolute;bottom:130%;left:-8px;
+  width:262px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
+  font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;z-index:3000;text-align:left}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.quick{font-size:11.5px;color:var(--gold);cursor:pointer;display:inline-block;margin-top:4px}
+.quick:hover{text-decoration:underline}
+.rescount{font-size:12.5px;color:var(--muted);border:1px solid var(--line2);background:var(--panel);
+  border-radius:8px;padding:8px 11px;margin-top:14px}
+.rescount b{color:var(--gold)}
+.eplist{margin-top:8px;max-height:300px;overflow-y:auto;border:1px solid var(--line2);
+  border-radius:8px;background:var(--panel)}
+.eprow{padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12.4px;
+  color:var(--muted);line-height:1.45}
+.eprow:hover{background:var(--panel2)}
+.eprow.on{background:rgba(242,183,5,.10);border-left:3px solid var(--gold);padding-left:8px}
+.eprow b{color:var(--text)}
+.eprow .m{color:var(--dim);font-size:11.6px}
+.detail{margin-top:14px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;
+  padding:12px 14px;font-size:12.6px}
+.detail h3{margin:0 0 2px;font-size:14.5px;color:var(--text)}
+.detail .per{font-size:11.3px;color:var(--dim);margin-bottom:8px}
+.detail table{width:100%;border-collapse:collapse;font-size:12.3px}
+.detail td{padding:3px 0;color:var(--muted);border-bottom:1px solid var(--line)}
+.detail td+td{text-align:right;color:var(--text);font-weight:600}
+.detail .sec{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--gold);
+  margin:10px 0 3px}
+.btnrow{display:flex;gap:8px;margin-top:12px}
+.btn2{flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--line2);
+  background:var(--panel);color:var(--text);font:700 13px "Segoe UI",sans-serif;cursor:pointer}
+.btn2:hover{border-color:var(--gold)}
+.btn2.gold{background:var(--gold);border-color:var(--gold);color:#161308}
+.btn2.gold:hover{background:var(--gold-d)}
+.notice{background:rgba(242,183,5,.07);border:1px solid rgba(242,183,5,.35);border-radius:8px;
+  padding:12px 14px;font-size:12.8px;color:#e8d9a8;line-height:1.55;margin-top:10px}
+.notice code{background:#04070c;border:1px solid var(--line2);border-radius:4px;
+  padding:1px 6px;font-size:11.5px;display:inline-block;margin:2px 0}
+.filternote{font-size:11.8px;color:var(--dim);border-left:2px solid var(--line2);
+  padding:2px 0 2px 10px;margin-top:16px;line-height:1.5}
+/* map controls */
+.basebox{position:absolute;top:12px;right:12px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)}
+.basebox label{display:flex;gap:7px;align-items:center;margin:3px 0;color:var(--text);cursor:pointer}
+.basebox input{accent-color:var(--gold)}
+.layerbox{position:absolute;bottom:16px;left:12px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
+.layerbox label{display:flex;gap:7px;align-items:center;margin:3px 0;color:var(--text)}
+.layerbox input{accent-color:var(--gold)}
+.maplegend{position:absolute;bottom:16px;right:12px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
+.maplegend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
+.maplegend .dt{width:9px;height:9px;border-radius:50%;display:inline-block}
+.maplegend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+@media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:56vh}#map{height:52vh}}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="index.html">
+    <span class="name">RUN<b>OFF</b></span>
+    <span class="sub"><b>R</b>adar and <b>U</b>SGS <b>N</b>etworked<br><b>O</b>bservations of <b>F</b>lash <b>F</b>loods</span>
+  </a>
+  <div class="partners">
+    <img src="assets/logos/ciroh.png" alt="CIROH" onerror="this.outerHTML='<span class=p>CIROH</span>'">
+    <img src="assets/logos/cuahsi.png" alt="CUAHSI" onerror="this.outerHTML='<span class=p>CUAHSI</span>'">
+    <img src="assets/logos/si2026.png" alt="Summer Institute 2026" onerror="this.outerHTML='<span class=p>Summer Institute 2026</span>'">
+  </div>
+  <nav class="toplinks">
+    <a href="about.html">About</a>
+    <a href="records.html">Flash Flood Records</a>
+    <a href="https://github.com/NWC-CUAHSI-Summer-Institute/runoff" target="_blank" rel="noopener">GitHub</a>
+    <a class="cta" href="access.html">Access Dataset</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <aside class="rail">
+    <div class="body">
+
+      <div class="railtitle">Flash flood episodes
+        <span class="i" data-tip="A storm episode is one whole storm system in the NOAA Storm Events Database: a tropical storm, a squall line, a frontal system. One episode can produce many flash flood events across several counties. This page is for modeling work that starts from storms and rainfall rather than from stream gages.">i</span>
+      </div>
+      <p style="font-size:12.6px;color:var(--muted);margin:4px 0 0;line-height:1.55">
+        Browse every weather-caused flash flood episode in the lower 48, pick episodes by
+        rainfall and impact criteria, and download their events, Local Storm Reports, and
+        MRMS rainfall tables. No stream gage required.
+      </p>
+
+      <div id="nobuild" class="notice" hidden>
+        <b>The episode catalog has not been built in this copy of the site.</b><br>
+        Build it from the repository root (Python 3.10+, pandas):<br>
+        <code>python engine/lsr/fetch_lsrs.py --wy 2021 2025</code><br>
+        <code>python engine/episodes/build_catalog.py --stormevents data/stormevents</code><br>
+        then reload this page. MRMS rainfall columns are added later, at your pace, by
+        <code>python engine/episodes/mrms_stats.py</code>. See engine/episodes/README.md.
+      </div>
+
+      <div id="filters" hidden>
+      <div class="railtitle" style="margin-top:18px">Filters</div>
+      <div class="grid2">
+        <div>
+          <label class="f">From year</label>
+          <select id="y-from"></select>
+        </div>
+        <div>
+          <label class="f">To year</label>
+          <select id="y-to"></select>
+        </div>
+      </div>
+      <label class="f">States <span style="color:var(--dim)">(none picked = all CONUS)</span></label>
+      <select id="sel-states" multiple size="5"></select>
+      <span class="quick" id="st-clear">Clear state selection</span>
+
+      <label class="f">Min flash flood events <b id="v-ev">0</b>
+        <span class="i" data-tip="Events are the individual flash flood reports inside an episode, from the NOAA Storm Events Database. Raising this keeps only episodes that flooded more places.">i</span>
+      </label>
+      <input type="range" id="f-ev" min="0" max="30" step="1" value="0">
+
+      <label class="f" id="lab-lsr">Min Local Storm Reports <b id="v-lsr">0</b>
+        <span class="i" data-tip="LSRs are real-time reports from NWS offices: spotters, law enforcement, the public. They are points with a time, a place, and often a remark. Flash flood LSRs are matched to each episode by time window and county footprint.">i</span>
+      </label>
+      <input type="range" id="f-lsr" min="0" max="30" step="1" value="0">
+
+      <label class="f">Min fatalities <b id="v-death">0</b></label>
+      <input type="range" id="f-death" min="0" max="20" step="1" value="0">
+
+      <label class="f">Min reported damage <b id="v-dmg">$0</b></label>
+      <input type="range" id="f-dmg" min="0" max="100" step="1" value="0">
+
+      <div id="mrmsfilters" hidden>
+        <div class="railtitle" style="margin-top:16px">Rainfall criteria (MRMS)
+          <span class="i" data-tip="Computed over each episode footprint from MRMS quantitative precipitation estimates on AWS. Rolling accumulations are the worst 6, 12, 24, or 72 hour rainfall total at any grid cell in the footprint. The return period is the most severe FLASH QPE ARI value: how rare that rainfall is at that place, in years.">i</span>
+        </div>
+        <label class="f">Min 24 h max accumulation <b id="v-a24">0 mm</b></label>
+        <input type="range" id="f-a24" min="0" max="300" step="5" value="0">
+        <label class="f">Min 72 h max accumulation <b id="v-a72">0 mm</b></label>
+        <input type="range" id="f-a72" min="0" max="500" step="10" value="0">
+        <label class="f">Min return period <b id="v-ari">any</b></label>
+        <input type="range" id="f-ari" min="0" max="200" step="5" value="0">
+      </div>
+
+      <label class="f" style="margin-top:16px">Sort episodes by</label>
+      <select id="sel-sort">
+        <option value="nev" selected>Most flash flood events</option>
+        <option value="nlsr">Most Local Storm Reports</option>
+        <option value="dmg">Highest damage</option>
+        <option value="deaths">Most fatalities</option>
+        <option value="acc24">Highest 24 h rainfall</option>
+        <option value="acc72">Highest 72 h rainfall</option>
+        <option value="ari">Highest return period</option>
+        <option value="date">Most recent</option>
+      </select>
+
+      <div class="rescount" id="rescount"></div>
+      <div class="eplist" id="eplist"></div>
+
+      <div class="detail" id="detail" hidden></div>
+
+      <div class="filternote">
+        Weather-caused flash floods only; dam and levee failure reports are excluded.
+        Event locations are NWS report coordinates, not storm centers; the episode
+        footprint and MRMS rainfall describe the storm itself. Source: NOAA NCEI Storm
+        Events Database, NWS Local Storm Reports via the Iowa Environmental Mesonet,
+        NOAA MRMS on AWS.
+      </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <div class="maparea">
+    <div id="map"></div>
+    <div class="basebox" id="basebox">
+      <label><input type="radio" name="base" value="dark" checked> Dark map</label>
+      <label><input type="radio" name="base" value="light"> Light map</label>
+      <label><input type="radio" name="base" value="sat"> Satellite</label>
+    </div>
+    <div class="layerbox">
+      <label><input type="checkbox" id="ly-dots" checked> Matching episodes</label>
+      <label><input type="checkbox" id="ly-ev" checked> Storm Events reports</label>
+      <label><input type="checkbox" id="ly-lsr" checked> Local Storm Reports</label>
+    </div>
+    <div class="maplegend">
+      <div class="k"><span class="dt" style="background:#8b95a5"></span>episode (matches filters)</div>
+      <div class="k"><span class="sw" style="background:rgba(242,183,5,.18);border:1px solid #f2b705"></span>selected episode footprint</div>
+      <div class="k"><span class="dt" style="background:#f2b705"></span>Storm Events flash flood</div>
+      <div class="k"><span class="dt" style="background:#5b8dd9"></span>Local Storm Report</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <div>
+      <div class="wordmark">RUN<b>OFF</b></div>
+      <p>General modeling access to the RUNOFF flash flood dataset: storm episodes,
+      events, Local Storm Reports, and MRMS rainfall over each episode footprint.
+      Built at the CUAHSI and NOAA National Water Center Summer Institute 2026 by
+      Team "Don't Runoff!".</p>
+    </div>
+    <div>
+      <h4>Dataset</h4>
+      <a href="about.html">About RUNOFF</a>
+      <a href="access.html">Access Data</a>
+      <a href="records.html">Flash Flood Records</a>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute/runoff" target="_blank" rel="noopener">RUNOFF on GitHub</a>
+    </div>
+    <div>
+      <h4>Community</h4>
+      <a href="https://github.com/NWC-CUAHSI-Summer-Institute" target="_blank" rel="noopener">Summer Institute GitHub</a>
+      <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">Iowa Environmental Mesonet</a>
+      <a href="https://ciroh.ua.edu/" target="_blank" rel="noopener">CIROH</a>
+      <a href="https://www.cuahsi.org/" target="_blank" rel="noopener">CUAHSI</a>
+    </div>
+  </div>
+  <div class="credits">
+    All data on this website is experimental and provided for research purposes only.
+    This work was supported by the Cooperative Institute for Research to Operations in
+    Hydrology (CIROH) under award NA22NWS4320003 from the NOAA Cooperative Institute
+    Program. Findings do not necessarily reflect the views of NOAA.
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="assets/data/states_geo.js"></script>
+<script src="assets/data/counties_geo.js"></script>
+<script src="assets/data/episodes.js" onerror="window.EPCAT_MISSING=true"></script>
+<script src="assets/data/episode_points.js" onerror="window.EPPTS_MISSING=true"></script>
+<script src="assets/js/basemaps.js"></script>
+<script src="assets/js/episodes.js"></script>
+</body>
+</html>

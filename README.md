@@ -92,11 +92,16 @@ We welcome contributions! See [CONTRIBUTING.md](https://github.com/mhpi/generic_
 ## Website
 
 The RUNOFF access portal lives in this repository and is served with GitHub Pages:
-`index.html` (landing), `about.html` (how the dataset is built), and `access.html`
-(the experiment builder: pick a geographic scope, filter watersheds, choose USGS
-products and forcing, download a package of engine commands preconfigured for your
-selection). Map data sits in `assets/data/` (simplified HUC8 GeoJSON and the gage
-table); design notes in `docs/WEBSITE_DESIGN.md`.
+`index.html` (landing), `about.html` (how the dataset is built), `access.html`
+(opens with a purpose question, then the NextGen experiment builder: pick a
+geographic scope, filter watersheds, choose USGS products and forcing, download a
+package of engine commands preconfigured for your selection), `episodes.html`
+(general flash flood modeling: browse storm episodes with events, Local Storm
+Reports, and MRMS footprint rainfall, no gage required; built by
+`engine/episodes/` + `engine/lsr/`), and `records.html` (county and HUC8 impact
+records). Map data sits in `assets/data/`; basemaps come from
+`assets/js/basemaps.js` (CARTO with Esri/OSM failover); design notes in
+`docs/WEBSITE_DESIGN.md`.
 
 Local preview:
 

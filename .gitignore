@@ -160,6 +160,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# raw archives staged by the episode engine (large; rebuildable)
+data/lsr/
+data/stormevents/
+
 # Spyder project settings
 .spyderproject
 .spyproject

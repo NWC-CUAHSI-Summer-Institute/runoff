@@ -75,6 +75,29 @@
 .legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
 .legend .dt{width:9px;height:9px;border-radius:50%;display:inline-block}
 @media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:52vh}#map{height:56vh}}
+/* purpose chooser overlay */
+.purpose{position:fixed;inset:0;z-index:5000;background:rgba(7,10,15,.88);
+  backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px}
+.purpose[hidden]{display:none}
+.purpose .box{max-width:860px;width:100%}
+.purpose h2{font-size:24px;margin:0 0 6px;text-align:center}
+.purpose h2 b{color:var(--gold)}
+.purpose .sub2{color:var(--muted);text-align:center;margin:0 0 22px;font-size:14.5px}
+.pcards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.pcards{grid-template-columns:1fr}}
+.pcard{display:block;text-align:left;background:var(--panel);border:1px solid var(--line2);
+  border-radius:12px;padding:20px 22px;cursor:pointer;color:var(--text);
+  font:inherit;transition:border-color .15s}
+.pcard:hover{border-color:var(--gold)}
+.pcard .tag{display:inline-block;font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;
+  color:#161308;background:var(--gold);border-radius:4px;padding:3px 8px;font-weight:800;margin-bottom:10px}
+.pcard .tag.blue{background:var(--blue);color:#0a1220}
+.pcard h3{margin:0 0 8px;font-size:16.5px}
+.pcard p{margin:0;font-size:13.2px;color:var(--muted);line-height:1.55}
+.pcard ul{margin:10px 0 0;padding-left:18px;font-size:12.6px;color:var(--muted)}
+.pcard ul li{margin:3px 0}
+.purpose .foot2{text-align:center;margin-top:16px;font-size:12.5px;color:var(--dim)}
+.purpose .foot2 a{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -92,9 +115,58 @@
   <nav class="toplinks">
     <a href="about.html">About</a>
     <a href="records.html">Flash Flood Records</a>
+    <a href="https://github.com/NWC-CUAHSI-Summer-Institute/runoff" target="_blank" rel="noopener">GitHub</a>
     <a class="cta" href="access.html">Access Dataset</a>
   </nav>
 </header>
+
+<div class="purpose" id="purpose" hidden>
+  <div class="box">
+    <h2>What do you need <b>RUNOFF</b> for?</h2>
+    <p class="sub2">Two ways into the same dataset. Pick the one that matches your work; you can switch any time.</p>
+    <div class="pcards">
+      <button class="pcard" id="p-general">
+        <span class="tag blue">Episodes and events</span>
+        <h3>General flash flood modeling</h3>
+        <p>I want flash flood episodes and events with storm reports and rainfall.
+        A stream gage in the basin is not required.</p>
+        <ul>
+          <li>Browse storm episodes on a map and filter them by rainfall criteria</li>
+          <li>NOAA Storm Events and Local Storm Reports (LSRs) for each episode</li>
+          <li>MRMS rainfall over each episode footprint: rolling 6, 12, 24, 72 hour accumulations and the max return period</li>
+        </ul>
+      </button>
+      <button class="pcard" id="p-nextgen">
+        <span class="tag">NextGen ready</span>
+        <h3>NextGen based flash flood modeling</h3>
+        <p>I want basin experiment packages on the NextGen HydroFabric: forcing,
+        USGS streamflow, and cataloged events at gaged basins.</p>
+        <ul>
+          <li>Pick basins by geography, impacts, and gage coverage</li>
+          <li>MRMS or AORC forcing at your timestep, engine ready</li>
+          <li>Download a package with commands, config, and a run guide</li>
+        </ul>
+      </button>
+    </div>
+    <p class="foot2">Not sure? The <a href="about.html">About page</a> explains both paths in two paragraphs.</p>
+  </div>
+</div>
+<script>
+(function(){
+  var ov=document.getElementById("purpose");
+  var remembered="";
+  try{ remembered=sessionStorage.getItem("runoff_purpose")||""; }catch(e){}
+  var skip=(location.hash==="#nextgen")||remembered==="nextgen";
+  if(!skip) ov.hidden=false; else ov.hidden=true;
+  document.getElementById("p-nextgen").addEventListener("click",function(){
+    try{sessionStorage.setItem("runoff_purpose","nextgen");}catch(e){}
+    ov.hidden=true;
+  });
+  document.getElementById("p-general").addEventListener("click",function(){
+    location.href="episodes.html";
+  });
+})();
+</script>
 
 <div class="wrap">
   <aside class="rail">
@@ -149,6 +221,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="assets/data/data.js"></script>
 <script src="assets/data/huc8.js"></script>
+<script src="assets/js/basemaps.js"></script>
 <script src="assets/js/access.js"></script>
 </body>
 </html>

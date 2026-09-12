@@ -83,15 +83,7 @@ function colorOf(v){
 /* ---------- map ---------- */
 var map=L.map("map",{zoomSnap:.5, attributionControl:true, preferCanvas:true})
          .setView([38.6,-95.8],4.5);
-var BASES={
-  dark:  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-         {maxZoom:12, attribution:"&copy; OpenStreetMap &copy; CARTO"}),
-  light: L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-         {maxZoom:12, attribution:"&copy; OpenStreetMap &copy; CARTO"}),
-  sat:   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-         {maxZoom:12, attribution:"Imagery &copy; Esri"})
-};
-BASES.dark.addTo(map);
+var BASE=BASEMAPS.attach(map,"dark");   /* CARTO first, Esri/OSM failover */
 
 map.createPane("statepane");  map.getPane("statepane").style.zIndex=430;
 map.getPane("statepane").style.pointerEvents="none";   /* lines on top, clicks pass through */
@@ -244,10 +236,7 @@ document.getElementById("y-all").addEventListener("click",function(){
   state.y0=2015; state.y1=2025; s0.value=2015; s1.value=2025; redraw(false);
 });
 document.querySelectorAll("#basebox input").forEach(function(r){
-  r.addEventListener("change",function(){
-    for (var k in BASES) map.removeLayer(BASES[k]);
-    BASES[this.value].addTo(map);
-  });
+  r.addEventListener("change",function(){ BASE.set(this.value); });
 });
 
 /* ---------- boot ---------- */

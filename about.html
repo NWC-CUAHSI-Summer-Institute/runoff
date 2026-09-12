@@ -21,6 +21,7 @@
   <nav class="toplinks">
     <a href="about.html">About</a>
     <a href="records.html">Flash Flood Records</a>
+    <a href="https://github.com/NWC-CUAHSI-Summer-Institute/runoff" target="_blank" rel="noopener">GitHub</a>
     <a class="cta" href="access.html">Access Dataset</a>
   </nav>
 </header>
@@ -40,6 +41,28 @@
       operational catchment network. RUNOFF fills that gap. Any flash flood modeling
       effort in the United States, inside or outside the NextGen framework, can use
       it for calibration, evaluation, and benchmarking.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Two ways into the dataset</h2>
+    <p>
+      <b>General flash flood modeling.</b> Start from storms, not from gages. The
+      <a href="episodes.html">episode browser</a> holds every weather-caused flash
+      flood episode in the lower 48: its Storm Events reports, its Local Storm
+      Reports (LSRs), and MRMS rainfall over the episode footprint as rolling 6, 12,
+      24, and 72 hour accumulations plus the max FLASH ARI return period. Filter
+      episodes by rainfall criteria, then download their tables. A stream gage in
+      the basin is not required, which is the shape of data that Flash Flood
+      Guidance style development needs. Note that Storm Events coordinates are NWS
+      report locations, not storm centers; the footprint and the MRMS grids
+      characterize the storm itself.
+    </p>
+    <p>
+      <b>NextGen based flash flood modeling.</b> The <a href="access.html#nextgen">
+      experiment wizard</a> is unchanged: pick basins by geography, impacts, and
+      gage coverage, choose MRMS or AORC forcing at your timestep, and download an
+      engine-ready package with commands, config, and a run guide.
     </p>
   </div>
 

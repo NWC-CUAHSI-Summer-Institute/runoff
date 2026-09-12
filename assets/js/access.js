@@ -84,8 +84,7 @@ function selTotals(ids){ var t={e:0,d:0,dmg:0,g:0};
 
 /* ---------------- map ---------------- */
 var map=L.map("map",{preferCanvas:true}).setView([38.6,-96],5);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-  {maxZoom:13,attribution:"&copy; OpenStreetMap contributors &copy; CARTO"}).addTo(map);
+BASEMAPS.attach(map,"dark");   /* CARTO first, Esri/OSM failover (assets/js/basemaps.js) */
 var rend=L.canvas({padding:0.4});
 function hucStyle(f){
   var p=f.properties;
