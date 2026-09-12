@@ -80,6 +80,7 @@ MIN_COVERAGE = 0.8      # fraction of hours a rolling window needs to count
 
 
 def urls_for(product: str, dt: pd.Timestamp, qpe: bool):
+    """Candidate URLs for one hour of one product: AWS, then the ISU mirror for QPE."""
     d = dt.strftime("%Y%m%d")
     hms = dt.strftime("%H") + "0000"
     urls = [f"{AWS}/CONUS/{product}/{d}/MRMS_{product}_{d}-{hms}.grib2.gz"]
@@ -91,8 +92,10 @@ def urls_for(product: str, dt: pd.Timestamp, qpe: bool):
 
 
 def fetch_grid(product: str, dt: pd.Timestamp, bbox, qpe: bool):
-    """Cropped 2D array for one hour, or None (missing hour). bbox is
-    (min_lat, min_lon, max_lat, max_lon) in -180..180 longitudes."""
+    """Cropped 2D array for one hour, or None (missing hour).
+
+    bbox is (min_lat, min_lon, max_lat, max_lon) in -180..180 longitudes.
+    """
     import xarray as xr
     raw = None
     for url in urls_for(product, dt, qpe):
@@ -225,6 +228,7 @@ def episode_ari(ep):
 
 
 def main() -> None:
+    """Compute MRMS rolling accumulations and FLASH ARI stats per episode."""
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--catalog", type=Path, default=HERE / "data" / "episodes" / "episodes.csv")

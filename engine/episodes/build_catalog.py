@@ -72,6 +72,7 @@ USE = ["EPISODE_ID","EVENT_ID","STATE","STATE_FIPS","EVENT_TYPE","CZ_TYPE",
 
 
 def dollars(s) -> float:
+    """Parse a StormEvents damage string such as 10.00K or 2.5M into dollars."""
     if pd.isna(s) or s == "":
         return 0.0
     m = re.match(r"^([0-9.]+)\s*([KMBkmb]?)$", str(s).strip())
@@ -92,11 +93,12 @@ def compose_dt(df, ym, day, hhmm):
     mo = (df[ym] % 100).astype(int)
     hh = (df[hhmm] // 100).astype(int).clip(0, 23)
     mi = (df[hhmm] % 100).astype(int).clip(0, 59)
-    return pd.to_datetime(dict(year=y, month=mo, day=df[day].astype(int),
-                               hour=hh, minute=mi), errors="coerce")
+    return pd.to_datetime({"year": y, "month": mo, "day": df[day].astype(int),
+                           "hour": hh, "minute": mi}, errors="coerce")
 
 
 def load_events(stormevents_dir: Path, wy0: int, wy1: int) -> pd.DataFrame:
+    """Load, filter, and UTC-stamp flash flood events for the water year window."""
     files = sorted(glob.glob(str(stormevents_dir / "StormEvents_details*d20*.csv.gz")))
     files += sorted(glob.glob(str(stormevents_dir / "StormEvents_details*d20*.csv")))
     years = set(range(wy0 - 1, wy1 + 1))            # calendar years touching the WY window
@@ -142,6 +144,7 @@ def load_events(stormevents_dir: Path, wy0: int, wy1: int) -> pd.DataFrame:
 
 
 def load_lsrs(lsr_dir: Path, types: set[str]) -> pd.DataFrame | None:
+    """Load the fetch_lsrs.py archive, keep the requested types, add county FIPS."""
     files = sorted(glob.glob(str(lsr_dir / "lsr_*.csv")))
     if not files:
         return None
@@ -180,7 +183,9 @@ def load_lsrs(lsr_dir: Path, types: set[str]) -> pd.DataFrame | None:
 
 def match_lsrs(ep, lsr, vvals, t_pre="3h", t_post="6h", pad=0.25):
     """Row indices of LSRs belonging to one episode (county first, bbox fallback).
-    vvals is lsr['valid'].values, materialized once by the caller."""
+
+    vvals is lsr['valid'].values, materialized once by the caller.
+    """
     w0 = ep["t0dt"] - pd.Timedelta(t_pre)
     w1 = ep["t1dt"] + pd.Timedelta(t_post)
     i0, i1 = np.searchsorted(vvals, np.datetime64(w0)), np.searchsorted(vvals, np.datetime64(w1), "right")
@@ -195,6 +200,7 @@ def match_lsrs(ep, lsr, vvals, t_pre="3h", t_post="6h", pad=0.25):
 
 
 def main() -> None:
+    """Build the episode catalog, CSV tables, and site payloads."""
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--stormevents", type=Path, required=True,
@@ -227,9 +233,11 @@ def main() -> None:
         bbox = [float(np.floor(lats.min() * 100) / 100), float(np.floor(lons.min() * 100) / 100),
                 float(np.ceil(lats.max() * 100) / 100), float(np.ceil(lons.max() * 100) / 100)]
         if bbox[2] - bbox[0] < 0.1:
-            bbox[0] -= 0.05; bbox[2] += 0.05
+            bbox[0] -= 0.05
+            bbox[2] += 0.05
         if bbox[3] - bbox[1] < 0.1:
-            bbox[1] -= 0.05; bbox[3] += 0.05
+            bbox[1] -= 0.05
+            bbox[3] += 0.05
         ep = {
             "id": epid,
             "t0dt": g.begin_utc.min(), "t1dt": g.end_utc.max(),

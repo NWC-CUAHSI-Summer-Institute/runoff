@@ -82,6 +82,7 @@ def fetch_chunk(state: str, sts: str, ets: str, out_path: Path,
 
 
 def main() -> None:
+    """Chunked, resumable LSR pull from the IEM archive."""
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--wy", nargs=2, type=int, metavar=("FIRST", "LAST"),
