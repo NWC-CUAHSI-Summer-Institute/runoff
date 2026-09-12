@@ -83,7 +83,7 @@ function colorOf(v){
 /* ---------- map ---------- */
 var map=L.map("map",{zoomSnap:.5, attributionControl:true, preferCanvas:true})
          .setView([38.6,-95.8],4.5);
-var BASE=BASEMAPS.attach(map,"dark");   /* CARTO first, Esri/OSM failover */
+var BASE=BASEMAPS.attach(map,"dark");   /* Esri canvas first, OSM failover */
 
 map.createPane("statepane");  map.getPane("statepane").style.zIndex=430;
 map.getPane("statepane").style.pointerEvents="none";   /* lines on top, clicks pass through */

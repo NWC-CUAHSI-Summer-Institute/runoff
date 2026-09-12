@@ -97,10 +97,11 @@ The RUNOFF access portal lives in this repository and is served with GitHub Page
 geographic scope, filter watersheds, choose USGS products and forcing, download a
 package of engine commands preconfigured for your selection), `episodes.html`
 (general flash flood modeling: browse storm episodes with events, Local Storm
-Reports, and MRMS footprint rainfall, no gage required; built by
-`engine/episodes/` + `engine/lsr/`), and `records.html` (county and HUC8 impact
-records). Map data sits in `assets/data/`; basemaps come from
-`assets/js/basemaps.js` (CARTO with Esri/OSM failover); design notes in
+Reports, and precomputed MRMS rainfall and FLASH return periods for every HUC8
+watershed each episode touched, no gage required and nothing computed online;
+built by `engine/episodes/` + `engine/lsr/`, see `engine/episodes/README.md`),
+and `records.html` (county and HUC8 impact records). Map data sits in `assets/data/`; basemaps come from
+`assets/js/basemaps.js` (Esri canvas with OSM failover, no key needed); design notes in
 `docs/WEBSITE_DESIGN.md`.
 
 Local preview:

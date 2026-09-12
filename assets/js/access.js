@@ -84,7 +84,7 @@ function selTotals(ids){ var t={e:0,d:0,dmg:0,g:0};
 
 /* ---------------- map ---------------- */
 var map=L.map("map",{preferCanvas:true}).setView([38.6,-96],5);
-BASEMAPS.attach(map,"dark");   /* CARTO first, Esri/OSM failover (assets/js/basemaps.js) */
+BASEMAPS.attach(map,"dark");   /* Esri canvas first, OSM failover (assets/js/basemaps.js) */
 var rend=L.canvas({padding:0.4});
 function hucStyle(f){
   var p=f.properties;

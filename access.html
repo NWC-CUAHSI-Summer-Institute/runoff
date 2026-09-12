@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Access RUNOFF - build your experiment</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="assets/vendor/leaflet.css">
 <link rel="stylesheet" href="assets/css/site.css">
 <style>
 .wrap{display:grid;grid-template-columns:380px 1fr;gap:0;border-bottom:1px solid var(--line)}
@@ -131,9 +131,9 @@
         <p>I want flash flood episodes and events with storm reports and rainfall.
         A stream gage in the basin is not required.</p>
         <ul>
-          <li>Browse storm episodes on a map and filter them by rainfall criteria</li>
+          <li>Browse storm episodes on a map and filter them by rainfall, return period coverage and impacts</li>
           <li>NOAA Storm Events and Local Storm Reports (LSRs) for each episode</li>
-          <li>MRMS rainfall over each episode footprint: rolling 6, 12, 24, 72 hour accumulations and the max return period</li>
+          <li>Precomputed MRMS rainfall and FLASH return periods for every HUC8 watershed the episode touched: 1, 3, 6 hour peaks, episode totals, share of each watershed above 1 to 200 years</li>
         </ul>
       </button>
       <button class="pcard" id="p-nextgen">
@@ -217,8 +217,8 @@
   purposes only.</div>
 </footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="assets/vendor/leaflet.js"></script>
+<script src="assets/vendor/jszip.min.js"></script>
 <script src="assets/data/data.js"></script>
 <script src="assets/data/huc8.js"></script>
 <script src="assets/js/basemaps.js"></script>

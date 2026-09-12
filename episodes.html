@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Flash Flood Episodes - RUNOFF general modeling access</title>
-<meta name="description" content="Browse CONUS flash flood episodes from the NOAA Storm Events Database with Local Storm Reports and MRMS rainfall over each episode footprint. Filter by rainfall criteria, impacts, and location; download episode tables for general flash flood modeling. No stream gage required.">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="description" content="Browse CONUS flash flood episodes from the NOAA Storm Events Database with Local Storm Reports and precomputed MRMS rainfall and FLASH return periods over every HUC8 watershed each episode touched. Filter by accumulation, return period coverage, impacts and location; download episode tables for general flash flood modeling. No stream gage required.">
+<link rel="stylesheet" href="assets/vendor/leaflet.css">
 <link rel="stylesheet" href="assets/css/site.css">
 <style>
-.wrap{display:grid;grid-template-columns:392px 1fr;gap:0;border-bottom:1px solid var(--line)}
+.wrap{display:grid;grid-template-columns:412px 1fr;gap:0;border-bottom:1px solid var(--line)}
 .rail{border-right:1px solid var(--line);background:var(--bg2);
       height:calc(100vh - 54px);overflow-y:auto}
 .rail .body{padding:16px 18px 26px}
@@ -24,13 +24,20 @@
    color:var(--gold);font-size:10px;font-weight:700;align-items:center;justify-content:center;
    cursor:help;position:relative;font-family:Georgia,serif;vertical-align:1px}
 .i:hover::after{content:attr(data-tip);position:absolute;bottom:130%;left:-8px;
-  width:262px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
+  width:270px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
   font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;z-index:3000;text-align:left}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .quick{font-size:11.5px;color:var(--gold);cursor:pointer;display:inline-block;margin-top:4px}
 .quick:hover{text-decoration:underline}
+.seg{display:flex;gap:0;border:1px solid var(--line2);border-radius:6px;overflow:hidden;margin-top:4px}
+.seg label{flex:1;text-align:center;padding:6px 0;font-size:12.5px;color:var(--muted);cursor:pointer;
+  background:var(--panel);border-right:1px solid var(--line2)}
+.seg label:last-child{border-right:0}
+.seg input{display:none}
+.seg input:checked+span{color:#161308;font-weight:700}
+.seg label.on{background:var(--gold);color:#161308;font-weight:700}
 .rescount{font-size:12.5px;color:var(--muted);border:1px solid var(--line2);background:var(--panel);
-  border-radius:8px;padding:8px 11px;margin-top:14px}
+  border-radius:8px;padding:8px 11px;margin-top:14px;line-height:1.5}
 .rescount b{color:var(--gold)}
 .eplist{margin-top:8px;max-height:300px;overflow-y:auto;border:1px solid var(--line2);
   border-radius:8px;background:var(--panel)}
@@ -40,15 +47,34 @@
 .eprow.on{background:rgba(242,183,5,.10);border-left:3px solid var(--gold);padding-left:8px}
 .eprow b{color:var(--text)}
 .eprow .m{color:var(--dim);font-size:11.6px}
+.eprow .m em{color:var(--muted);font-style:normal}
 .detail{margin-top:14px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;
   padding:12px 14px;font-size:12.6px}
 .detail h3{margin:0 0 2px;font-size:14.5px;color:var(--text)}
-.detail .per{font-size:11.3px;color:var(--dim);margin-bottom:8px}
+.detail .per{font-size:11.3px;color:var(--dim);margin-bottom:8px;line-height:1.5}
 .detail table{width:100%;border-collapse:collapse;font-size:12.3px}
-.detail td{padding:3px 0;color:var(--muted);border-bottom:1px solid var(--line)}
-.detail td+td{text-align:right;color:var(--text);font-weight:600}
+.detail td,.detail th{padding:3px 3px;color:var(--muted);border-bottom:1px solid var(--line);text-align:left;font-weight:400}
+.detail td.n{font-size:11.8px}
+.detail th{font-size:10.8px;text-transform:uppercase;letter-spacing:.5px;color:var(--dim)}
+.detail td.n,.detail th.n{text-align:right;white-space:nowrap}
+.detail td.n{color:var(--text);font-weight:600}
+.detail tr.hrow{cursor:pointer}
+.detail tr.hrow:hover td{background:var(--panel2)}
+.detail tr.hrow.on td{background:rgba(242,183,5,.12)}
 .detail .sec{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--gold);
-  margin:10px 0 3px}
+  margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center}
+.detail .sec small{text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px}
+.detail .kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:4px 0 2px}
+.detail .kv div{background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.detail .kv b{display:block;font-size:15px;color:var(--text)}
+.detail .kv span{font-size:11px;color:var(--dim)}
+.covbar{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-top:6px}
+.covbar div{text-align:center;font-size:10.5px;color:var(--dim);line-height:1.3}
+.covbar div i{display:block;height:34px;background:var(--bg2);border:1px solid var(--line);border-radius:3px;
+  position:relative;overflow:hidden;margin-bottom:2px}
+.covbar div i b{position:absolute;left:0;right:0;bottom:0;background:var(--gold);display:block}
+.covbar div em{font-style:normal;color:var(--text);display:block;font-size:11px}
+.spark{width:100%;height:78px;margin-top:6px;display:block}
 .btnrow{display:flex;gap:8px;margin-top:12px}
 .btn2{flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--line2);
   background:var(--panel);color:var(--text);font:700 13px "Segoe UI",sans-serif;cursor:pointer}
@@ -61,20 +87,30 @@
   padding:1px 6px;font-size:11.5px;display:inline-block;margin:2px 0}
 .filternote{font-size:11.8px;color:var(--dim);border-left:2px solid var(--line2);
   padding:2px 0 2px 10px;margin-top:16px;line-height:1.5}
+.dq{font-size:11.3px;color:var(--dim);margin-top:8px;line-height:1.5}
 /* map controls */
 .basebox{position:absolute;top:12px;right:12px;z-index:900;background:rgba(11,14,19,.92);
   border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)}
 .basebox label{display:flex;gap:7px;align-items:center;margin:3px 0;color:var(--text);cursor:pointer}
 .basebox input{accent-color:var(--gold)}
+.colorbox{position:absolute;top:12px;left:58px;z-index:900;background:rgba(11,14,19,.92);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);width:262px}
+.colorbox select{width:100%;margin-top:4px;padding:5px 7px;background:var(--panel);border:1px solid var(--line2);
+  border-radius:6px;color:var(--text);font:12.5px "Segoe UI",sans-serif}
+.colorbox .t{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--gold)}
 .layerbox{position:absolute;bottom:16px;left:12px;z-index:900;background:rgba(11,14,19,.92);
   border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
 .layerbox label{display:flex;gap:7px;align-items:center;margin:3px 0;color:var(--text)}
 .layerbox input{accent-color:var(--gold)}
 .maplegend{position:absolute;bottom:16px;right:12px;z-index:900;background:rgba(11,14,19,.92);
-  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted)}
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;font-size:12px;color:var(--muted);min-width:190px}
+.maplegend .t{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--gold);margin-bottom:4px}
 .maplegend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
-.maplegend .dt{width:9px;height:9px;border-radius:50%;display:inline-block}
-.maplegend .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+.maplegend .dt{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.maplegend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+.leaflet-popup-content table{border-collapse:collapse;margin-top:4px;width:100%}
+.leaflet-popup-content td{padding:1px 6px 1px 0;color:var(--muted);font-size:12.3px}
+.leaflet-popup-content td+td{text-align:right;font-weight:600;color:var(--text);white-space:nowrap}
 @media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:56vh}#map{height:52vh}}
 </style>
 </head>
@@ -103,12 +139,13 @@
     <div class="body">
 
       <div class="railtitle">Flash flood episodes
-        <span class="i" data-tip="A storm episode is one whole storm system in the NOAA Storm Events Database: a tropical storm, a squall line, a frontal system. One episode can produce many flash flood events across several counties. This page is for modeling work that starts from storms and rainfall rather than from stream gages.">i</span>
+        <span class="i" data-tip="A storm episode is one whole storm system in the NOAA Storm Events Database: a tropical storm, a squall line, a frontal system. One episode can produce many flash flood events across several counties. Every HUC8 watershed touched by the reporting counties is part of the episode footprint, and the MRMS rainfall and FLASH return periods are precomputed over that footprint and over each watershed.">i</span>
       </div>
       <p style="font-size:12.6px;color:var(--muted);margin:4px 0 0;line-height:1.55">
         Browse every weather-caused flash flood episode in the lower 48, pick episodes by
-        rainfall and impact criteria, and download their events, Local Storm Reports, and
-        MRMS rainfall tables. No stream gage required.
+        rainfall, return period and impact criteria, and download their events, Local Storm
+        Reports and precomputed MRMS tables per watershed. No stream gage required, nothing
+        to run: every number on this page was computed once from the MRMS archive.
       </p>
 
       <div id="nobuild" class="notice" hidden>
@@ -116,8 +153,8 @@
         Build it from the repository root (Python 3.10+, pandas):<br>
         <code>python engine/lsr/fetch_lsrs.py --wy 2021 2025</code><br>
         <code>python engine/episodes/build_catalog.py --stormevents data/stormevents</code><br>
-        then reload this page. MRMS rainfall columns are added later, at your pace, by
-        <code>python engine/episodes/mrms_stats.py</code>. See engine/episodes/README.md.
+        then the MRMS statistics with <code>engine/episodes/precompute_mrms.py</code>
+        and <code>build_mrms_payload.py</code>. See engine/episodes/README.md.
       </div>
 
       <div id="filters" hidden>
@@ -153,15 +190,33 @@
       <input type="range" id="f-dmg" min="0" max="100" step="1" value="0">
 
       <div id="mrmsfilters" hidden>
-        <div class="railtitle" style="margin-top:16px">Rainfall criteria (MRMS)
-          <span class="i" data-tip="Computed over each episode footprint from MRMS quantitative precipitation estimates on AWS. Rolling accumulations are the worst 6, 12, 24, or 72 hour rainfall total at any grid cell in the footprint. The return period is the most severe FLASH QPE ARI value: how rare that rainfall is at that place, in years.">i</span>
+        <div class="railtitle" style="margin-top:16px">Rainfall and return period
+          <span class="i" data-tip="Precomputed from the MRMS archive over the union of the HUC8 watersheds each episode touched. Accumulations: MRMS MultiSensor QPE 1 h Pass 2 (gauge corrected), rolling 1, 3 and 6 h windows ending inside the episode window. Return periods: FLASH QPE ARI 1, 3 and 6 h, the average recurrence interval in years of the observed accumulation at each grid cell; coverage is the share of the footprint area at or above a return period at any time during the episode.">i</span>
         </div>
-        <label class="f">Min 24 h max accumulation <b id="v-a24">0 mm</b></label>
-        <input type="range" id="f-a24" min="0" max="300" step="5" value="0">
-        <label class="f">Min 72 h max accumulation <b id="v-a72">0 mm</b></label>
-        <input type="range" id="f-a72" min="0" max="500" step="10" value="0">
-        <label class="f">Min return period <b id="v-ari">any</b></label>
-        <input type="range" id="f-ari" min="0" max="200" step="5" value="0">
+        <label class="f">Duration for the rainfall criteria and the map</label>
+        <div class="seg" id="seg-dur">
+          <label class="on"><input type="radio" name="dur" value="1" checked><span>1 h</span></label>
+          <label><input type="radio" name="dur" value="3"><span>3 h</span></label>
+          <label><input type="radio" name="dur" value="6"><span>6 h</span></label>
+        </div>
+        <label class="f"><span>Min peak <span id="lab-dur1">1 h</span> accumulation, any cell</span> <b id="v-mmax">0 mm</b>
+          <span class="i" data-tip="The highest rolling accumulation of the chosen duration reached by any MRMS grid cell (about 1 km) inside the footprint at any time during the episode.">i</span>
+        </label>
+        <input type="range" id="f-mmax" min="0" max="300" step="5" value="0">
+        <label class="f">Min episode rain, footprint mean <b id="v-rmean">0 mm</b>
+          <span class="i" data-tip="Area weighted mean over the footprint of the rain that fell from the episode start hour to one hour after its end.">i</span>
+        </label>
+        <input type="range" id="f-rmean" min="0" max="150" step="5" value="0">
+        <label class="f">Return period threshold</label>
+        <select id="sel-thr"></select>
+        <label class="f"><span>Min footprint coverage at or above it, <span id="lab-dur2">1 h</span></span> <b id="v-cov">0 %</b>
+          <span class="i" data-tip="Share of the footprint area where the FLASH ARI of the chosen duration reached the threshold at some hour of the episode. 25 percent at 10 years means a quarter of the touched watersheds saw a 10 year or rarer rainfall.">i</span>
+        </label>
+        <input type="range" id="f-cov" min="0" max="100" step="1" value="0">
+        <label class="f"><span>Min peak return period, any cell, <span id="lab-dur3">1 h</span></span> <b id="v-amax">any</b></label>
+        <input type="range" id="f-amax" min="0" max="200" step="5" value="0">
+        <label class="f" style="margin-top:8px"><span><input type="checkbox" id="f-only" style="accent-color:var(--gold);vertical-align:-2px"> Only episodes with MRMS statistics</span>
+          <span id="v-done" style="color:var(--dim)"></span></label>
       </div>
 
       <label class="f" style="margin-top:16px">Sort episodes by</label>
@@ -170,23 +225,27 @@
         <option value="nlsr">Most Local Storm Reports</option>
         <option value="dmg">Highest damage</option>
         <option value="deaths">Most fatalities</option>
-        <option value="acc24">Highest 24 h rainfall</option>
-        <option value="acc72">Highest 72 h rainfall</option>
-        <option value="ari">Highest return period</option>
+        <option value="mmax">Highest peak accumulation (chosen duration)</option>
+        <option value="rmean">Highest episode rain, footprint mean</option>
+        <option value="cov">Largest coverage at the threshold</option>
+        <option value="amax">Highest return period (chosen duration)</option>
+        <option value="km2">Largest footprint</option>
         <option value="date">Most recent</option>
       </select>
 
       <div class="rescount" id="rescount"></div>
+      <span class="quick" id="reset-all">Reset all filters</span>
       <div class="eplist" id="eplist"></div>
 
       <div class="detail" id="detail" hidden></div>
 
       <div class="filternote">
         Weather-caused flash floods only; dam and levee failure reports are excluded.
-        Event locations are NWS report coordinates, not storm centers; the episode
-        footprint and MRMS rainfall describe the storm itself. Source: NOAA NCEI Storm
-        Events Database, NWS Local Storm Reports via the Iowa Environmental Mesonet,
-        NOAA MRMS on AWS.
+        Event locations are NWS report coordinates, not storm centers; the watershed
+        footprint and the MRMS fields describe the storm itself. Sources: NOAA NCEI Storm
+        Events Database; NWS Local Storm Reports and the MRMS archive via the Iowa
+        Environmental Mesonet (NOAA MRMS on AWS as fallback); USGS Watershed Boundary
+        Dataset; FLASH QPE ARI from NSSL.
       </div>
       </div>
 
@@ -195,6 +254,17 @@
 
   <div class="maparea">
     <div id="map"></div>
+    <div class="colorbox" id="colorbox" hidden>
+      <div class="t">Colour the map by</div>
+      <select id="sel-metric">
+        <option value="cov" selected>Coverage at or above the return period threshold</option>
+        <option value="mmax">Peak accumulation, chosen duration</option>
+        <option value="mmean">Mean of the cell peaks, chosen duration</option>
+        <option value="amax">Peak return period, chosen duration</option>
+        <option value="rmean">Episode rain, watershed mean</option>
+      </select>
+      <div id="colornote" style="font-size:11.2px;color:var(--dim);margin-top:5px;line-height:1.4"></div>
+    </div>
     <div class="basebox" id="basebox">
       <label><input type="radio" name="base" value="dark" checked> Dark map</label>
       <label><input type="radio" name="base" value="light"> Light map</label>
@@ -202,12 +272,13 @@
     </div>
     <div class="layerbox">
       <label><input type="checkbox" id="ly-dots" checked> Matching episodes</label>
+      <label><input type="checkbox" id="ly-huc" checked> Watersheds of the episode</label>
+      <label><input type="checkbox" id="ly-cty" checked> Reporting counties</label>
       <label><input type="checkbox" id="ly-ev" checked> Storm Events reports</label>
       <label><input type="checkbox" id="ly-lsr" checked> Local Storm Reports</label>
     </div>
-    <div class="maplegend">
+    <div class="maplegend" id="maplegend">
       <div class="k"><span class="dt" style="background:#8b95a5"></span>episode (matches filters)</div>
-      <div class="k"><span class="sw" style="background:rgba(242,183,5,.18);border:1px solid #f2b705"></span>selected episode footprint</div>
       <div class="k"><span class="dt" style="background:#f2b705"></span>Storm Events flash flood</div>
       <div class="k"><span class="dt" style="background:#5b8dd9"></span>Local Storm Report</div>
     </div>
@@ -219,9 +290,9 @@
     <div>
       <div class="wordmark">RUN<b>OFF</b></div>
       <p>General modeling access to the RUNOFF flash flood dataset: storm episodes,
-      events, Local Storm Reports, and MRMS rainfall over each episode footprint.
-      Built at the CUAHSI and NOAA National Water Center Summer Institute 2026 by
-      Team "Don't Runoff!".</p>
+      events, Local Storm Reports, and MRMS rainfall and return periods over every
+      watershed each episode touched. Built at the CUAHSI and NOAA National Water Center
+      Summer Institute 2026 by Team "Don't Runoff!".</p>
     </div>
     <div>
       <h4>Dataset</h4>
@@ -246,10 +317,11 @@
   </div>
 </footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="assets/vendor/leaflet.js"></script>
+<script src="assets/vendor/jszip.min.js"></script>
 <script src="assets/data/states_geo.js"></script>
 <script src="assets/data/counties_geo.js"></script>
+<script src="assets/data/huc8.js"></script>
 <script src="assets/data/episodes.js" onerror="window.EPCAT_MISSING=true"></script>
 <script src="assets/data/episode_points.js" onerror="window.EPPTS_MISSING=true"></script>
 <script src="assets/js/basemaps.js"></script>

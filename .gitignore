@@ -234,3 +234,7 @@ event_extraction/event_extraction_inputs/huc8_conus/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# local geoprocessing inputs (large; rebuilt by engine/episodes/fetch_huc8_wbd.py)
+data/geo/
+data/episodes/mrms_run.log

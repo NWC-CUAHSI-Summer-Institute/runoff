@@ -33,9 +33,11 @@ Episode/LSR matching: an LSR belongs to an episode when its type is in
 either its UGC county code is one of the episode's counties or, when the UGC
 is absent, its point falls in the episode bounding box padded 0.25 degrees.
 
-Rerun this script after any mrms_stats.py run: it re-reads every
-data/episodes/<id>/mrms_summary.json and refreshes the site payload, so the
-rainfall filters on episodes.html pick up the new numbers.
+The MRMS statistics shown on episodes.html come from precompute_mrms.py
+(per episode JSON under assets/data/ep/) and are merged into the payload by
+build_mrms_payload.py, which this script calls at the end when it is present.
+The older bbox statistics of mrms_stats.py (data/episodes/<id>/mrms_summary.json)
+are still merged into episodes.csv for reference but no longer drive the site.
 
 Note for Flash Flood Guidance style users: Storm Events coordinates are the
 NWS report locations, not storm centers. The episode footprint (counties,
@@ -338,8 +340,16 @@ def main() -> None:
     sz1 = (args.site_data / "episodes.js").stat().st_size / 1e6
     sz2 = (args.site_data / "episode_points.js").stat().st_size / 1e6
     print(f"site payloads written: episodes.js {sz1:.2f} MB, episode_points.js {sz2:.2f} MB")
-    print("open episodes.html to browse; run engine/episodes/mrms_stats.py to add "
-          "rainfall stats, then rerun this script to merge them into the payload")
+    # merge the precomputed MRMS statistics (assets/data/ep/*.json) into the payload
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from build_mrms_payload import build as merge_mrms
+        merge_mrms()
+    except FileNotFoundError as e:
+        print(f"MRMS payload not merged ({e}); run build_huc8_footprints.py, "
+              "precompute_mrms.py and build_mrms_payload.py, see engine/episodes/README.md")
+    print("open episodes.html to browse")
 
 
 if __name__ == "__main__":

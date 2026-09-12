@@ -10,6 +10,8 @@ Open index.html through any static server. For local preview:
 | index.html | Landing: what RUNOFF is, experimental badge, About / Access Dataset |
 | about.html | Data preparation story: 19,993 -> 7,990 -> 5,097 funnel, event separation, components |
 | access.html | The explorer: scope, watershed filters, experiment selection, forcing, .py package |
+| episodes.html | General modelling path: storm episodes with events, LSRs and precomputed MRMS rainfall and FLASH return periods per HUC8 (engine/episodes/README.md) |
+| records.html | County and HUC8 flash flood records, 2015 to 2025 |
 | prototypes/ | Earlier interface drafts, kept for reference |
 | event_separation/ | Jessica's event extraction pipeline (the backend the generated script drives) |
 
@@ -37,6 +39,14 @@ Nothing requires scrolling the page.
 |---|---|---|
 | huc8.js (+ .geojson) | 2.7 MB | USGS WBD HUC8, simplified (tol 0.012, coords 3 dp), per-basin stats joined (events, deaths, damage, stations, event gages) |
 | data.js | 0.4 MB | 5,897 GAGES-II gages < 1000 km2 with event counts, impacts, QPE-quality fields |
+| episodes.js | 1.3 MB | episode catalogue (var EPCAT) with the precomputed MRMS summary per episode (engine/episodes/build_catalog.py, build_mrms_payload.py) |
+| episode_points.js | 2.5 MB | Storm Events and LSR points per episode (var EPPTS) |
+| ep/<id>.json | 2 to 30 KB each | per episode MRMS statistics for the footprint, the counties and every HUC8, fetched on click (engine/episodes/precompute_mrms.py) |
+| counties_geo.js, states_geo.js | 3.6 + 0.8 MB | NWS county polygons simplified (tol 0.004), states dissolved from them |
+
+Basemaps: Esri canvas (dark, light, imagery) with OpenStreetMap failover, no key
+(assets/js/basemaps.js). The public CARTO CDN started requiring a key in 2026 and
+was dropped.
 
 The raw HUC8 shapefile (360 MB) and RUNOFF_interface.zip (258 MB) exceed GitHub
 limits and are excluded via .gitignore. The pipeline README documents where to
