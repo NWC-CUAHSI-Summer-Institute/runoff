@@ -18,7 +18,6 @@ import argparse
 import logging
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 log = logging.getLogger('byo-convert')
@@ -155,6 +154,7 @@ def read_product(path: str, data_format: str, var_name, time_name):
 
 
 def main():
+    """Convert a user supplied QPE/QPF product to the AORC-format forcing NetCDF."""
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s')
     args = parse_args()
 

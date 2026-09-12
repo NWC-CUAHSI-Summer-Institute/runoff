@@ -21,7 +21,6 @@ P in 'mm [60 min]-1'), so engine/forcing/merge_15min.py consumes it with
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import pandas as pd

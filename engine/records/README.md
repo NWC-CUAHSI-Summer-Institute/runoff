@@ -10,8 +10,8 @@ Everything on the site is rebuilt from two inputs:
 
 Steps (Python 3.10+, pandas + geopandas + pyogrio + shapely):
 
-    python prep_events.py   # filter + aggregate -> county_stats.js, huc8_stats.js
-    python prep_geo.py      # simplify boundaries -> counties_geo.js, huc8_geo.js, states_geo.js
+    python engine/records/prep_events.py --stormevents data/stormevents --huc8-shp data/geo/HUC8_US.shp
+    python engine/records/prep_geo.py --counties-shp data/geo/c_16ap26.shp --huc8-shp data/geo/HUC8_US.shp
 
 Filtering applied, in order: EVENT_TYPE equals Flash Flood; county-type reports
 (CZ_TYPE C); lower 48 states and DC; flood causes containing "dam" or "levee" removed
@@ -21,7 +21,8 @@ county or watershed per year; each event is assigned to the HUC8 containing its
 reported begin coordinates (one event lacked coordinates and is absent from the
 watershed view).
 
-Edit the paths at the top of each script to point at your local copies of the inputs.
+Both scripts take their input paths as arguments (run with --help) and write to
+assets/data by default.
 The scripts write the `assets/data/*.js` payloads consumed by `records.html`. The
 HUC8 boundary payload is not duplicated here: the records page reuses the site's
 existing `assets/data/huc8.js` layer.

@@ -592,7 +592,6 @@ def main():
     huc_meta = {h: {"name": r["name"], "states": r["states"], "area_km2": float(r["area_km2"])}
                 for h, r in lookup.iterrows()}
 
-    import geopandas as gpd
     from shapely.geometry import shape
     t = time.time()
     need = set(eh[eh.episode_id.isin(ep.episode_id)].huc8)
