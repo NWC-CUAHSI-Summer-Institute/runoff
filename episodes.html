@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="assets/vendor/leaflet.css">
 <link rel="stylesheet" href="assets/css/site.css">
 <style>
-.wrap{display:grid;grid-template-columns:412px 1fr;gap:0;border-bottom:1px solid var(--line)}
+.wrap{display:grid;grid-template-columns:412px 6px 1fr;gap:0;border-bottom:1px solid var(--line)}
 .rail{border-right:1px solid var(--line);background:var(--bg2);
       height:calc(100vh - 54px);overflow-y:auto}
 .rail .body{padding:16px 18px 26px}
@@ -23,9 +23,11 @@
 .i{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--gold);
    color:var(--gold);font-size:10px;font-weight:700;align-items:center;justify-content:center;
    cursor:help;position:relative;font-family:Georgia,serif;vertical-align:1px}
-.i:hover::after{content:attr(data-tip);position:absolute;bottom:130%;left:-8px;
-  width:270px;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
-  font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;z-index:3000;text-align:left}
+.tipbox{position:fixed;z-index:6000;background:#04070c;border:1px solid var(--line2);color:#dbe4ef;
+  font:12px/1.5 "Segoe UI",sans-serif;padding:9px 11px;border-radius:6px;text-align:left;
+  box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.splitter{cursor:col-resize;background:var(--line);transition:background .15s}
+.splitter:hover{background:var(--gold)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .quick{font-size:11.5px;color:var(--gold);cursor:pointer;display:inline-block;margin-top:4px}
 .quick:hover{text-decoration:underline}
@@ -115,7 +117,7 @@
 .leaflet-popup-content table{border-collapse:collapse;margin-top:4px;width:100%}
 .leaflet-popup-content td{padding:1px 6px 1px 0;color:var(--muted);font-size:12.3px}
 .leaflet-popup-content td+td{text-align:right;font-weight:600;color:var(--text);white-space:nowrap}
-@media(max-width:980px){.wrap{grid-template-columns:1fr}.rail{height:auto;max-height:56vh}#map{height:52vh}}
+@media(max-width:980px){.wrap{grid-template-columns:1fr !important}.splitter{display:none}.rail{height:auto;max-height:56vh}#map{height:52vh}}
 </style>
 </head>
 <body>
@@ -255,7 +257,7 @@
 
     </div>
   </aside>
-
+  <div class="splitter" id="splitter" title="Drag to resize the panel"></div>
   <div class="maparea">
     <div id="map"></div>
     <div class="colorbox" id="colorbox" hidden>

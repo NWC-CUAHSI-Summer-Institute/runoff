@@ -50,12 +50,54 @@ document.querySelectorAll("#basebox input").forEach(function(r){
 });
 map.createPane("statepane"); map.getPane("statepane").style.zIndex=430;
 map.getPane("statepane").style.pointerEvents="none";
-map.createPane("hucpane"); map.getPane("hucpane").style.zIndex=440;
 map.createPane("ctypane"); map.getPane("ctypane").style.zIndex=445;
 map.getPane("ctypane").style.pointerEvents="none";
-map.createPane("ptpane"); map.getPane("ptpane").style.zIndex=460;
+/* Every interactive vector (episode dots, watersheds, report points) is drawn by ONE
+   canvas renderer in the default overlay pane. Separate canvas panes look right but
+   the topmost canvas swallows the clicks meant for the layers below it, so after the
+   first selection the dots stop responding. Stacking order is kept with bringToFront. */
 L.geoJSON(STATESGJ,{pane:"statepane",interactive:false,
   style:{color:"#9aa5b3",weight:1,opacity:.4,fill:false}}).addTo(map);
+
+/* ---------------- (i) tips: fixed box on the body, never clipped by the panel ---------------- */
+(function(){
+  var tip=document.createElement("div"); tip.className="tipbox"; tip.hidden=true;
+  document.body.appendChild(tip);
+  function show(ic){
+    tip.textContent=ic.getAttribute("data-tip")||"";
+    var r=ic.getBoundingClientRect(), w=Math.min(300,window.innerWidth-16);
+    tip.style.width=w+"px";
+    tip.style.left=Math.min(Math.max(8,r.left-8),window.innerWidth-w-8)+"px";
+    tip.hidden=false;
+    var top=r.top-tip.offsetHeight-8; if(top<8) top=r.bottom+8;
+    tip.style.top=top+"px";
+  }
+  document.querySelectorAll(".i[data-tip]").forEach(function(ic){
+    ic.addEventListener("mouseenter",function(){ show(ic); });
+    ic.addEventListener("mouseleave",function(){ tip.hidden=true; });
+    ic.addEventListener("click",function(ev){ ev.preventDefault(); if(tip.hidden) show(ic); else tip.hidden=true; });
+  });
+  var rail=document.querySelector(".rail");
+  if(rail) rail.addEventListener("scroll",function(){ tip.hidden=true; });
+})();
+
+/* ---------------- resizable panel: drag the bar between the panel and the map ---------------- */
+(function(){
+  var wrap=document.querySelector(".wrap"), sp=el("splitter");
+  if(!wrap||!sp) return;
+  var w=412;
+  try{ var s=parseInt(localStorage.getItem("runoff_railw"),10); if(s>=300&&s<=760) w=s; }catch(e){}
+  function apply(){ if(window.innerWidth>980) wrap.style.gridTemplateColumns=w+"px 6px 1fr"; }
+  apply();
+  var drag=false;
+  sp.addEventListener("mousedown",function(ev){ drag=true; ev.preventDefault(); document.body.style.userSelect="none"; });
+  window.addEventListener("mousemove",function(ev){ if(!drag) return; w=Math.min(760,Math.max(300,ev.clientX)); apply(); });
+  window.addEventListener("mouseup",function(){
+    if(!drag) return; drag=false; document.body.style.userSelect="";
+    try{ localStorage.setItem("runoff_railw",String(w)); }catch(e){}
+    map.invalidateSize();
+  });
+})();
 
 /* ---------------- payload check ---------------- */
 var HAVE_CAT=(typeof EPCAT!=="undefined")&&EPCAT&&EPCAT.rows&&EPCAT.rows.length>0;
@@ -274,13 +316,19 @@ function renderList(){
 }
 
 /* ---------------- map layers ---------------- */
-var rend=L.canvas({padding:0.4});                  /* matching episode dots, below the watersheds */
-var rendPt=L.canvas({padding:0.4,pane:"ptpane"});  /* report points, above the watersheds */
+var rend=L.canvas({padding:0.4});   /* the one shared renderer, see the note above */
 var dotsG=L.layerGroup().addTo(map);
 var hucG=L.layerGroup().addTo(map);
 var ctyG=L.layerGroup().addTo(map);
 var evG=L.layerGroup().addTo(map);
 var lsrG=L.layerGroup().addTo(map);
+function raisePoints(){   /* report points above everything else on the shared canvas */
+  [evG,lsrG].forEach(function(g){ g.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); }); });
+}
+function raiseSelection(){  /* watersheds above the dots, then the points above the watersheds */
+  hucG.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); });
+  raisePoints();
+}
 function metricOfEp(e,k){   /* footprint level value of the map metric from EPCAT */
   if(!e.has) return null;
   if(k==="cov") return covAt(e,UI.thr);
@@ -307,6 +355,7 @@ function renderDots(){
     m.on("click",function(){ select(e,null); });
     dotsG.addLayer(m);
   });
+  raiseSelection();   /* redrawn dots would otherwise sit on top of the selection */
 }
 
 /* geometry indexes */
@@ -389,10 +438,10 @@ function select(e,row){
   /* points: from the map payload now, redrawn with narratives once rep/<id>.json is in */
   var pts=HAVE_PTS?(EPPTS[String(e.id)]||EPPTS[e.id]||null):null;
   SELPTS=pts;
+  /* watersheds first (without statistics, then with them once the JSON is in), points on top */
+  drawHucs(e,null);
   drawPoints(pts);
   loadReports(e);
-  /* watersheds, first without statistics, then with them once the JSON is in */
-  drawHucs(e,null);
   zoomTo(e,9);
   renderDetail(e,null);
   if(e.has || hasMRMS) loadJson(e);
@@ -403,7 +452,7 @@ function drawPoints(pts){
   evG.clearLayers(); lsrG.clearLayers();
   if(!pts) return;
   (pts.ev||[]).forEach(function(p){
-    var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:4,weight:1,
+    var m=L.circleMarker([p[0],p[1]],{renderer:rend,radius:4,weight:1,
       color:"#161308",fillOpacity:.95,fillColor:"#f2b705"});
     m.bindPopup("<b>Storm Events flash flood</b><br>"+esc(p[2])+" UTC"+
       (p[6]?("<br>"+esc(p[6])+(p[7]?(", "+esc(p[7])):"")):"")+
@@ -412,7 +461,7 @@ function drawPoints(pts){
     evG.addLayer(m);
   });
   (pts.lsr||[]).forEach(function(p){
-    var m=L.circleMarker([p[0],p[1]],{renderer:rendPt,pane:"ptpane",radius:3.4,weight:1,
+    var m=L.circleMarker([p[0],p[1]],{renderer:rend,radius:3.4,weight:1,
       color:"#0a1220",fillOpacity:.95,fillColor:"#5b8dd9"});
     m.bindPopup("<b>Local Storm Report: "+esc(p[3]||"FLASH FLOOD")+"</b><br>"+esc(p[2])+" UTC"+
       (p[6]||p[7]?("<br>"+esc(p[6]||"")+(p[6]&&p[7]?", ":"")+esc(p[7]||"")):"")+
@@ -473,15 +522,16 @@ function drawHucs(e,j){
   (e.hucs||[]).forEach(function(code){
     var f=HUCIDX[code]; if(!f) return;
     var h=byH[code]||null, v=h?metricOf(h,k):null;
-    var lyr=L.geoJSON(f,{pane:"hucpane",style:{
+    var lyr=L.geoJSON(f,{renderer:rend,style:{
       color:"#f2b705",weight:1,opacity:.85,
       fillColor:h?colorOf(k,v):"#f2b705", fillOpacity:h?.62:.12}});
     lyr.on("click",function(){ hucPopup(lyr,code,f.properties.n,h); highlightRow(code); });
-    lyr.on("mouseover",function(){ lyr.setStyle({weight:2.4}); lyr.bringToFront(); });
+    lyr.on("mouseover",function(){ lyr.setStyle({weight:2.4}); lyr.bringToFront(); raisePoints(); });
     lyr.on("mouseout",function(){ lyr.setStyle({weight:1}); });
     HUCLAYERS[code]=lyr;
     hucG.addLayer(lyr);
   });
+  raisePoints();   /* the watersheds were just (re)drawn on top of the report points */
   renderLegend();
 }
 function hucPopup(lyr,code,name,h){
