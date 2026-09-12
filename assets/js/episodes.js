@@ -317,6 +317,21 @@ function renderList(){
 
 /* ---------------- map layers ---------------- */
 var rend=L.canvas({padding:0.4});   /* the one shared renderer, see the note above */
+
+/* Square marker for episodes (reports stay circles). Same geometry, bounds and
+   hit-testing as CircleMarker; only the canvas drawing differs. */
+L.Canvas.include({
+  _updateSquare:function(layer){
+    if(!this._drawing||layer._empty()) return;
+    var p=layer._point, r=Math.max(Math.round(layer._radius),1), ctx=this._ctx;
+    ctx.beginPath();
+    ctx.rect(p.x-r,p.y-r,2*r,2*r);
+    this._fillStroke(ctx,layer);
+  }
+});
+var SquareMarker=L.CircleMarker.extend({
+  _updatePath:function(){ this._renderer._updateSquare(this); }
+});
 var dotsG=L.layerGroup().addTo(map);
 var hucG=L.layerGroup().addTo(map);
 var ctyG=L.layerGroup().addTo(map);
@@ -342,13 +357,13 @@ function renderDots(){
   /* skip the rebuild when the matched set and the colouring are unchanged (slider drags fire fast) */
   var k=hasMRMS?el("sel-metric").value:"";
   var sig=matched.length+":"+(matched.length?matched[0].id+"-"+matched[matched.length-1].id:"")+":"+k+":"+UI.dur+":"+UI.thr;
-  if(hasMRMS){ var note=el("colornote"); if(note) note.textContent="Dots: every matching episode with statistics, footprint value. Polygons: the watersheds of the selected episode. Duration and threshold follow the filters: "+UI.dur+" h, "+THR[UI.thr]+" yr."; }
+  if(hasMRMS){ var note=el("colornote"); if(note) note.textContent="Squares: every matching episode with statistics, footprint value. Polygons: the watersheds of the selected episode. Circles: its Storm Events reports (gold) and Local Storm Reports (blue). Duration and threshold follow the filters: "+UI.dur+" h, "+THR[UI.thr]+" yr."; }
   if(sig===dotsSig) return;
   dotsSig=sig;
   dotsG.clearLayers();
   matched.forEach(function(e){
     var v=hasMRMS?metricOfEp(e,k):null;
-    var m=L.circleMarker(e.c,{renderer:rend,radius:Math.min(9,2+Math.sqrt(e.nev)),
+    var m=new SquareMarker(e.c,{renderer:rend,radius:Math.min(8,2+Math.sqrt(e.nev)),
       weight:isNum(v)?0.6:0,color:"#0b0e13",fillOpacity:isNum(v)?.85:.45,fillColor:isNum(v)?colorOf(k,v):"#8b95a5"});
     m.bindTooltip("Episode "+e.id+" | "+epTitle(e)+" | "+e.nev+" events"+
       (isNum(v)?(" | "+SCALES[k].fmt(k==="cov"?Math.round(v*100)/100:Math.round(v))):""),{sticky:true});
@@ -405,9 +420,9 @@ function renderLegend(){
     for(var i=1;i<b.length;i++)
       html+="<div class='k'><span class='sw' style='background:"+RAMP[i]+"'></span>"+sc.fmt(b[i-1])+" to "+sc.fmt(b[i])+"</div>";
     html+="<div class='k'><span class='sw' style='background:"+RAMP[5]+"'></span>"+sc.fmt(b[b.length-1])+" and over</div>";
-    html+="<div class='k'><span class='dt' style='background:#8b95a5'></span>episode without statistics yet</div>";
+    html+="<div class='k'><span class='sq' style='background:#8b95a5'></span>episode without statistics yet</div>";
   }else{
-    html+="<div class='k'><span class='dt' style='background:#8b95a5'></span>episode (matches filters)</div>";
+    html+="<div class='k'><span class='sq' style='background:#8b95a5'></span>episode (matches filters)</div>";
     if(SEL) html+="<div class='k'><span class='sw' style='background:rgba(242,183,5,.15);border:1px solid #f2b705'></span>watershed of the episode</div>";
   }
   html+="<div class='k'><span class='sw' style='border:1.5px dashed #f2b705;background:transparent'></span>reporting county</div>";
