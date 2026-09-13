@@ -63,6 +63,8 @@
 .detail tr.hrow{cursor:pointer}
 .detail tr.hrow:hover td{background:var(--panel2)}
 .detail tr.hrow.on td{background:rgba(242,183,5,.12)}
+.detail tr.grow{cursor:pointer}
+.detail tr.grow:hover td{background:var(--panel2)}
 .detail .sec{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--gold);
   margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center}
 .detail .sec small{text-transform:none;letter-spacing:0;color:var(--dim);font-size:11px}
@@ -114,6 +116,8 @@
 .maplegend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
 .maplegend .dt{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .maplegend .sq{width:10px;height:10px;display:inline-block;flex:none}
+.maplegend .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
+  border-bottom:11px solid #3f9e6a;display:inline-block;flex:none}
 .maplegend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
 .leaflet-popup-content table{border-collapse:collapse;margin-top:4px;width:100%}
 .leaflet-popup-content td{padding:1px 6px 1px 0;color:var(--muted);font-size:12.3px}
@@ -196,6 +200,41 @@
       <label class="f">Min reported damage <b id="v-dmg">$0</b></label>
       <input type="range" id="f-dmg" min="0" max="100" step="1" value="0">
 
+      <label class="f" id="lab-ng">Min USGS gages in the footprint <b id="v-ng">0</b>
+        <span class="i" data-tip="RUNOFF gages: USGS stream gages draining less than 1000 km2 whose HUC8 watershed is part of the episode footprint. Click a green triangle on the map to see the station and its drainage basin.">i</span>
+      </label>
+      <input type="range" id="f-ng" min="0" max="20" step="1" value="0">
+
+      <div id="flashfilters" hidden>
+        <div class="railtitle" style="margin-top:16px">FLASH models and guidance
+          <span class="i" data-tip="NSSL FLASH products read at the top of every hour of the episode window and summarized over the footprint. Unit streamflow is the modeled peak flow per unit drainage area (m3/s/km2) from the CREST, SAC-SMA and hydrophobic (burn scar) models; values above about 2 to 5 usually mean significant flash flooding. The QPE/FFG ratio compares MRMS rainfall with the NWS flash flood guidance: 1.0 means the rain reached the guidance.">i</span>
+        </div>
+        <label class="f">Model for the unit streamflow criteria</label>
+        <select id="sel-model">
+          <option value="0" selected>CREST</option>
+          <option value="1">SAC-SMA</option>
+          <option value="2">Hydrophobic (burn scar)</option>
+        </select>
+        <label class="f">Peak unit streamflow between <b id="v-uq">any</b>
+          <span class="i" data-tip="Episode peak of the chosen model at any cell of the footprint, m3/s/km2. Set the two sliders to keep only episodes whose peak falls inside a range, for example between 2 and 10.">i</span>
+        </label>
+        <input type="range" id="f-uqmin" min="0" max="20" step="0.5" value="0">
+        <input type="range" id="f-uqmax" min="0" max="20" step="0.5" value="20">
+        <label class="f">QPE/FFG ratio window</label>
+        <select id="sel-ffgdur">
+          <option value="0">1 h</option>
+          <option value="1">3 h</option>
+          <option value="2">6 h</option>
+          <option value="3" selected>max of the windows</option>
+        </select>
+        <label class="f">Min peak QPE/FFG ratio, any cell <b id="v-ffg">any</b></label>
+        <input type="range" id="f-ffg" min="0" max="5" step="0.1" value="0">
+        <label class="f">Min share of the footprint above guidance <b id="v-ffgcov">0 %</b>
+          <span class="i" data-tip="Share of the footprint area where the peak QPE/FFG ratio (max window) reached 1.0 during the episode: how much of the touched watersheds saw rainfall at or beyond the guidance.">i</span>
+        </label>
+        <input type="range" id="f-ffgcov" min="0" max="100" step="5" value="0">
+      </div>
+
       <div id="mrmsfilters" hidden>
         <div class="railtitle" style="margin-top:16px">Rainfall and return period
           <span class="i" data-tip="Precomputed from the MRMS archive over the union of the HUC8 watersheds each episode touched. Accumulations: MRMS MultiSensor QPE 1 h Pass 2 (gauge corrected), rolling 1, 3 and 6 h windows ending inside the episode window. Return periods: FLASH QPE ARI 1, 3 and 6 h, the average recurrence interval in years of the observed accumulation at each grid cell; coverage is the share of the footprint area at or above a return period at any time during the episode.">i</span>
@@ -236,6 +275,10 @@
         <option value="rmean">Highest episode rain, footprint mean</option>
         <option value="cov">Largest coverage at the threshold</option>
         <option value="amax">Highest return period (chosen duration)</option>
+        <option value="uq">Highest peak unit streamflow (chosen model)</option>
+        <option value="ffg">Highest peak QPE/FFG ratio (chosen window)</option>
+        <option value="ffgcov">Largest share above guidance</option>
+        <option value="ng">Most USGS gages in the footprint</option>
         <option value="km2">Largest footprint</option>
         <option value="date">Most recent</option>
       </select>
@@ -269,6 +312,8 @@
         <option value="mmean">Mean of the cell peaks, chosen duration</option>
         <option value="amax">Peak return period, chosen duration</option>
         <option value="rmean">Episode rain, watershed mean</option>
+        <option value="uq">FLASH peak unit streamflow, chosen model</option>
+        <option value="ffgcov">Share above flash flood guidance (max window)</option>
       </select>
       <div id="colornote" style="font-size:11.2px;color:var(--dim);margin-top:5px;line-height:1.4"></div>
     </div>
@@ -283,11 +328,13 @@
       <label><input type="checkbox" id="ly-cty" checked> Reporting counties</label>
       <label><input type="checkbox" id="ly-ev" checked> Storm Events reports</label>
       <label><input type="checkbox" id="ly-lsr" checked> Local Storm Reports</label>
+      <label><input type="checkbox" id="ly-gag" checked> USGS gages of the episode</label>
     </div>
     <div class="maplegend" id="maplegend">
       <div class="k"><span class="sq" style="background:#8b95a5"></span>episode (matches filters)</div>
       <div class="k"><span class="dt" style="background:#f2b705"></span>Storm Events flash flood</div>
       <div class="k"><span class="dt" style="background:#5b8dd9"></span>Local Storm Report</div>
+      <div class="k"><span class="tri"></span>USGS gage (under 1000 km2)</div>
     </div>
   </div>
 </div>
@@ -331,7 +378,8 @@
 <script src="assets/data/huc8.js"></script>
 <script src="assets/data/episodes.js" onerror="window.EPCAT_MISSING=true"></script>
 <script src="assets/data/episode_points.js" onerror="window.EPPTS_MISSING=true"></script>
-<script src="assets/js/basemaps.js?v=20260912b"></script>
-<script src="assets/js/episodes.js?v=20260912b"></script>
+<script src="assets/data/gages.js" onerror="window.GAGES2_MISSING=true"></script>
+<script src="assets/js/basemaps.js?v=20260912c"></script>
+<script src="assets/js/episodes.js?v=20260912c"></script>
 </body>
 </html>

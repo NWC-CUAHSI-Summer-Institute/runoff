@@ -34,7 +34,16 @@ once, here, and published as static files.
     python engine/episodes/precompute_mrms.py --start 2024-01-01 --end 2025-01-01
     python engine/episodes/precompute_mrms.py --episode 204934 --force
 
-    # 5. merge the statistics into the site payload (seconds; build_catalog.py also
+    # 5. FLASH model output and flash flood guidance over the episode window
+    #    (CREST, SAC-SMA, hydrophobic peak unit streamflow; QPE/FFG ratio 1, 3, 6 h, max);
+    #    resumable, roughly 3x the run time of step 4 for the same episodes
+    python engine/episodes/precompute_flash.py
+    python engine/episodes/precompute_flash.py --states TX --min-events 5
+
+    # 6. USGS gages of the RUNOFF set: NWIS names and NLDI drainage basins (once, ~2 h)
+    python engine/gages/fetch_basins.py
+
+    # 7. merge everything into the site payload (seconds; build_catalog.py also
     #    calls it at the end)
     python engine/episodes/build_mrms_payload.py
 
@@ -136,7 +145,15 @@ per episode JSON.
 ### Site payload format (consumed by assets/js/episodes.js)
 
 EPCAT.fields order: id, t0, t1, states, nev, nlsr, deaths, inj, dmg, fips,
-bbox, hucs, km2, m1, m3, m6, rain, a1, a3, a6. Times are UTC "YYYY-MM-DD HH";
+bbox, hucs, km2, m1, m3, m6, rain, a1, a3, a6, ng, gages, uq, ffg (ng and gages:
+count and ids of the RUNOFF USGS gages whose HUC8 is in the footprint; uq =
+[crest, sac, hp] peak unit streamflow in m3/s/km2; ffg = [peak ratio 1 h, 3 h,
+6 h, max window, share of the footprint whose peak max-window ratio reached
+1.0 in permille]; uq and ffg are null until precompute_flash.py ran). The per
+episode JSON gains a "flash" record (footprint and per HUC8 statistics, hourly
+series) and the gages live in assets/data/gages.js (var GAGES2 = {id: [lat,
+lon, area_km2, name, huc8, basin]}) with one basin polygon per gage under
+assets/data/basin/. Times are UTC "YYYY-MM-DD HH";
 nlsr is -1 when LSRs were not fetched; bbox is [min_lat, min_lon, max_lat,
 max_lon] of the reports; hucs is the list of HUC8 codes; km2 the footprint
 area; m1/m3/m6 = [max, mean] of the cell peak accumulation in mm; rain =

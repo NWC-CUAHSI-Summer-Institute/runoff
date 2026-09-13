@@ -126,24 +126,41 @@ var EPS=EPCAT.rows.map(function(r){
 var hasLSR=EPS.some(function(e){return e.nlsr>=0;});
 var N_MRMS=EPS.filter(function(e){return e.has;}).length;
 var hasMRMS=N_MRMS>0;
+/* USGS gages (assets/data/gages.js) and FLASH products (precompute_flash.py) are optional */
+var HAVE_GAGES=(typeof GAGES2!=="undefined")&&!!GAGES2&&EPS.some(function(e){return e.ng>0;});
+var hasFLASH=EPS.some(function(e){return !!(e.uq&&e.ffg);});
 if(!hasLSR){ el("lab-lsr").style.display="none"; el("f-lsr").style.display="none"; }
+if(!HAVE_GAGES){ el("lab-ng").style.display="none"; el("f-ng").style.display="none"; }
 if(hasMRMS){
   el("mrmsfilters").hidden=false; el("colorbox").hidden=false;
   el("v-done").textContent=fmtN(N_MRMS)+" of "+fmtN(EPS.length)+" computed";
 }
+if(hasFLASH){ el("flashfilters").hidden=false; }
+else{
+  /* keep the selects consistent when the products are absent */
+  ["uq","ffgcov"].forEach(function(v){ var o=el("sel-metric").querySelector("option[value="+v+"]"); if(o) o.disabled=true; });
+  ["uq","ffg","ffgcov"].forEach(function(v){ var o=el("sel-sort").querySelector("option[value="+v+"]"); if(o) o.disabled=true; });
+}
+if(!HAVE_GAGES){ var og=el("sel-sort").querySelector("option[value=ng]"); if(og) og.disabled=true; }
 function hoursBetween(a,b){
   var d=(Date.parse(String(b).replace(" ","T")+":00:00Z")-Date.parse(String(a).replace(" ","T")+":00:00Z"))/36e5;
   return isFinite(d)?d:null;
 }
 
 /* per episode accessors that follow the chosen duration and threshold */
-var UI={dur:1, thr:1};       /* thr = index into THR */
+var UI={dur:1, thr:1, model:0, ffgdur:3};   /* thr = index into THR; model 0 CREST 1 SAC 2 HP; ffgdur 0..3 = 1h 3h 6h max */
+var MODEL_KEY=["crest","sac","hp"], MODEL_NAME=["CREST","SAC-SMA","hydrophobic"];
+var FFG_KEY=["ffg1","ffg3","ffg6","ffgmax"], FFG_NAME=["1 h","3 h","6 h","max window"];
 function mArr(e){ return e["m"+UI.dur]; }
 function aArr(e){ return e["a"+UI.dur]; }
 function mMax(e){ var a=mArr(e); return a&&isNum(a[0])?a[0]:null; }
 function rMean(e){ return e.rain&&isNum(e.rain[1])?e.rain[1]:null; }
 function aMax(e){ var a=aArr(e); return a&&isNum(a[0])?a[0]:null; }
 function covAt(e,ti){ var a=aArr(e); return a&&isNum(a[1+ti])?a[1+ti]/1000:null; }
+function uqMax(e){ return e.uq&&isNum(e.uq[UI.model])?e.uq[UI.model]:null; }
+function ffgMax(e){ return e.ffg&&isNum(e.ffg[UI.ffgdur])?e.ffg[UI.ffgdur]:null; }
+function ffgCov(e){ return e.ffg&&isNum(e.ffg[4])?e.ffg[4]/1000:null; }
+function nGages(e){ return isNum(e.ng)?e.ng:0; }
 
 /* damage slider: log scale from $10K to the catalog max */
 var DMG_MAX=1e5;
@@ -215,8 +232,29 @@ var sMmax=slider("f-mmax","v-mmax",function(v){return v+" mm";});
 var sRmean=slider("f-rmean","v-rmean",function(v){return v+" mm";});
 var sCov=slider("f-cov","v-cov",function(v){return v+" %";});
 var sAmax=slider("f-amax","v-amax",function(v){return v<=0?"any":(">= "+v+" yr");});
+var sNg=slider("f-ng","v-ng",function(v){return String(v);});
 el("f-only").addEventListener("change",refresh);
 el("sel-sort").addEventListener("change",refresh);
+
+/* FLASH controls: the two unit streamflow sliders form one range (decimal steps) */
+function uqLabel(){
+  var lo=parseFloat(el("f-uqmin").value), hi=parseFloat(el("f-uqmax").value);
+  el("v-uq").textContent=(lo<=0&&hi>=20)?"any":(lo+" and "+(hi>=20?"20+":hi)+" m3/s/km2");
+}
+["f-uqmin","f-uqmax"].forEach(function(id){
+  el(id).addEventListener("input",function(){
+    var lo=el("f-uqmin"), hi=el("f-uqmax");
+    if(parseFloat(lo.value)>parseFloat(hi.value)){ if(id==="f-uqmin") hi.value=lo.value; else lo.value=hi.value; }
+    uqLabel(); refresh();
+  });
+});
+uqLabel();
+var sFfg=el("f-ffg");
+sFfg.addEventListener("input",function(){
+  el("v-ffg").textContent=parseFloat(sFfg.value)<=0?"any":(">= "+parseFloat(sFfg.value).toFixed(1)); refresh(); });
+var sFfgcov=slider("f-ffgcov","v-ffgcov",function(v){return v+" %";});
+el("sel-model").addEventListener("change",function(){ UI.model=parseInt(this.value,10); refresh(); redrawSelection(); });
+el("sel-ffgdur").addEventListener("change",function(){ UI.ffgdur=parseInt(this.value,10); refresh(); redrawSelection(); });
 
 /* ---------------- filtering + sorting ---------------- */
 function selectedStates(){
@@ -251,6 +289,20 @@ function matches(e){
     if(vc>0 && !(covAt(e,UI.thr)*100>=vc)) return false;
     if(va>0 && !(aMax(e)>=va)) return false;
   }
+  if(HAVE_GAGES && nGages(e)<parseInt(sNg.value,10)) return false;
+  if(hasFLASH){
+    /* like the rainfall criteria: an active FLASH criterion excludes episodes without the products */
+    var lo=parseFloat(el("f-uqmin").value), hi=parseFloat(el("f-uqmax").value);
+    var vf=parseFloat(sFfg.value), vfc=parseInt(sFfgcov.value,10);
+    if(lo>0 || hi<20){
+      var u=uqMax(e);
+      if(!isNum(u)) return false;
+      if(u<lo) return false;
+      if(hi<20 && u>hi) return false;
+    }
+    if(vf>0 && !(ffgMax(e)>=vf)) return false;
+    if(vfc>0 && !(ffgCov(e)*100>=vfc)) return false;
+  }
   return true;
 }
 function sortKey(e,k){
@@ -259,6 +311,10 @@ function sortKey(e,k){
   if(k==="rmean") return rMean(e);
   if(k==="cov") return covAt(e,UI.thr);
   if(k==="amax") return aMax(e);
+  if(k==="uq") return uqMax(e);
+  if(k==="ffg") return ffgMax(e);
+  if(k==="ffgcov") return ffgCov(e);
+  if(k==="ng") return nGages(e);
   var v=e[k];
   return (v===null||v===undefined)?-1:v;
 }
@@ -298,6 +354,11 @@ function renderList(){
       extra="<br><em>"+UI.dur+" h peak "+mm(mMax(e))+"</em>, "+yr(aMax(e))+" peak return period, "+
         pct(cv)+" at or above "+THR[UI.thr]+" yr";
     }else if(hasMRMS){ extra="<br>MRMS statistics not computed yet"; }
+    if(hasFLASH&&e.uq&&e.ffg){
+      extra+="<br>"+MODEL_NAME[UI.model]+" peak "+(isNum(uqMax(e))?uqMax(e).toFixed(1):"-")+" m3/s/km2, "+
+        (isNum(ffgMax(e))?ffgMax(e).toFixed(2):"-")+" peak QPE/FFG ("+FFG_NAME[UI.ffgdur]+"), "+pct(ffgCov(e))+" above guidance";
+    }
+    if(HAVE_GAGES&&nGages(e)) extra+="<br>"+nGages(e)+" USGS gage"+(nGages(e)>1?"s":"");
     html+="<div class='eprow' data-i='"+i+"'><b>Episode "+e.id+"</b> "+epTitle(e)+
       "<div class='m'>"+e.nev+" events"+
       (e.nlsr>=0?(", "+e.nlsr+" LSRs"):"")+
@@ -332,19 +393,39 @@ L.Canvas.include({
 var SquareMarker=L.CircleMarker.extend({
   _updatePath:function(){ this._renderer._updateSquare(this); }
 });
+/* Triangle marker for USGS gages (point up). */
+L.Canvas.include({
+  _updateTriangle:function(layer){
+    if(!this._drawing||layer._empty()) return;
+    var p=layer._point, r=Math.max(Math.round(layer._radius),1), ctx=this._ctx;
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y-r);
+    ctx.lineTo(p.x+r,p.y+r);
+    ctx.lineTo(p.x-r,p.y+r);
+    ctx.closePath();
+    this._fillStroke(ctx,layer);
+  }
+});
+var TriangleMarker=L.CircleMarker.extend({
+  _updatePath:function(){ this._renderer._updateTriangle(this); }
+});
 var dotsG=L.layerGroup().addTo(map);
 var hucG=L.layerGroup().addTo(map);
 var ctyG=L.layerGroup().addTo(map);
 var evG=L.layerGroup().addTo(map);
 var lsrG=L.layerGroup().addTo(map);
-function raisePoints(){   /* report points above everything else on the shared canvas */
-  [evG,lsrG].forEach(function(g){ g.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); }); });
+var basG=L.layerGroup().addTo(map);   /* drainage basins of clicked gages */
+var gagG=L.layerGroup().addTo(map);   /* USGS gages of the selected episode */
+function raisePoints(){   /* basins, then report points and gages, above everything else on the shared canvas */
+  [basG,evG,lsrG,gagG].forEach(function(g){ g.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); }); });
 }
 function raiseSelection(){  /* watersheds above the dots, then the points above the watersheds */
   hucG.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); });
   raisePoints();
 }
 function metricOfEp(e,k){   /* footprint level value of the map metric from EPCAT */
+  if(k==="uq") return uqMax(e);
+  if(k==="ffgcov") return ffgCov(e);
   if(!e.has) return null;
   if(k==="cov") return covAt(e,UI.thr);
   if(k==="mmax") return mMax(e);
@@ -356,7 +437,7 @@ function metricOfEp(e,k){   /* footprint level value of the map metric from EPCA
 function renderDots(){
   /* skip the rebuild when the matched set and the colouring are unchanged (slider drags fire fast) */
   var k=hasMRMS?el("sel-metric").value:"";
-  var sig=matched.length+":"+(matched.length?matched[0].id+"-"+matched[matched.length-1].id:"")+":"+k+":"+UI.dur+":"+UI.thr;
+  var sig=matched.length+":"+(matched.length?matched[0].id+"-"+matched[matched.length-1].id:"")+":"+k+":"+UI.dur+":"+UI.thr+":"+UI.model+":"+UI.ffgdur;
   if(hasMRMS){ var note=el("colornote"); if(note) note.textContent="Squares: every matching episode with statistics, footprint value. Polygons: the watersheds of the selected episode. Circles: its Storm Events reports (gold) and Local Storm Reports (blue). Duration and threshold follow the filters: "+UI.dur+" h, "+THR[UI.thr]+" yr."; }
   if(sig===dotsSig) return;
   dotsSig=sig;
@@ -365,8 +446,9 @@ function renderDots(){
     var v=hasMRMS?metricOfEp(e,k):null;
     var m=new SquareMarker(e.c,{renderer:rend,radius:Math.min(8,2+Math.sqrt(e.nev)),
       weight:isNum(v)?0.6:0,color:"#0b0e13",fillOpacity:isNum(v)?.85:.45,fillColor:isNum(v)?colorOf(k,v):"#8b95a5"});
+    var vv=(k==="cov"||k==="ffgcov")?Math.round(v*100)/100:(k==="uq"?Math.round(v*10)/10:Math.round(v));
     m.bindTooltip("Episode "+e.id+" | "+epTitle(e)+" | "+e.nev+" events"+
-      (isNum(v)?(" | "+SCALES[k].fmt(k==="cov"?Math.round(v*100)/100:Math.round(v))):""),{sticky:true});
+      (isNum(v)?(" | "+SCALES[k].fmt(vv)):""),{sticky:true});
     m.on("click",function(){ select(e,null); });
     dotsG.addLayer(m);
   });
@@ -391,7 +473,11 @@ var SCALES={
   amax: {breaks:[2,5,10,25,100], fmt:function(v){return v+" yr";},
          label:function(){return "peak "+UI.dur+" h return period, any cell";}},
   rmean:{breaks:[10,25,50,75,100], fmt:function(v){return v+" mm";},
-         label:function(){return "episode rain, watershed mean";}}
+         label:function(){return "episode rain, watershed mean";}},
+  uq:   {breaks:[1,2,4,7,10], fmt:function(v){return v+" m3/s/km2";},
+         label:function(){return "peak unit streamflow, "+MODEL_NAME[UI.model];}},
+  ffgcov:{breaks:[0.02,0.10,0.25,0.50,0.75], fmt:function(v){return Math.round(v*100)+"%";},
+         label:function(){return "share of the watershed above flash flood guidance (max window)";}}
 };
 function breaksOf(k){ var b=SCALES[k].breaks; return Array.isArray(b)?b:b[UI.dur]; }
 function colorOf(k,v){
@@ -407,7 +493,14 @@ function metricOf(h,k){   /* h = huc8 entry of the episode JSON */
   if(k==="mmean"){ var m2=h["max"+UI.dur]; return m2?m2.mean:null; }
   if(k==="amax"){ var a2=h["ari"+UI.dur]; return a2?a2.max:null; }
   if(k==="rmean"){ return h.rain&&h.rain.ep?h.rain.ep.mean:null; }
+  if(k==="uq"){ return h.fl&&isNum(h.fl[MODEL_KEY[UI.model]])?h.fl[MODEL_KEY[UI.model]]:null; }
+  if(k==="ffgcov"){ return h.fl&&isNum(h.fl.ffgmax_cov1)?h.fl.ffgmax_cov1:null; }
   return null;
+}
+function attachFlash(j){   /* hang the per HUC8 FLASH record on each watershed entry */
+  if(!j||!j.huc8) return;
+  var fh=(j.flash&&j.flash.huc8)||{};
+  j.huc8.forEach(function(h){ h.fl=fh[h.h]||null; });
 }
 el("sel-metric").addEventListener("change",function(){ renderDots(); renderLegend(); redrawSelection(); });
 
@@ -432,10 +525,11 @@ function renderLegend(){
 }
 
 /* ---------------- selection ---------------- */
-var SEL=null, SELJ=null, SELPTS=null, SELREP=null, HUCLAYERS={}, JCACHE={}, RCACHE={};
+var SEL=null, SELJ=null, SELPTS=null, SELREP=null, HUCLAYERS={}, JCACHE={}, RCACHE={}, BCACHE={};
 function clearSelection(){
   SEL=null; SELJ=null; SELPTS=null; SELREP=null; HUCLAYERS={};
   hucG.clearLayers(); ctyG.clearLayers(); evG.clearLayers(); lsrG.clearLayers();
+  gagG.clearLayers(); basG.clearLayers();
   el("detail").hidden=true;
   document.querySelectorAll(".eprow.on").forEach(function(r){r.classList.remove("on");});
   renderLegend();
@@ -456,10 +550,48 @@ function select(e,row){
   /* watersheds first (without statistics, then with them once the JSON is in), points on top */
   drawHucs(e,null);
   drawPoints(pts);
+  drawGages(e);
   loadReports(e);
   zoomTo(e,9);
   renderDetail(e,null);
   if(e.has || hasMRMS) loadJson(e);
+}
+/* USGS gages of the episode: green triangles; click one for its station and drainage basin */
+function drawGages(e){
+  gagG.clearLayers(); basG.clearLayers();
+  if(!HAVE_GAGES) return;
+  (e.gages||[]).forEach(function(id){
+    var g=GAGES2[id]; if(!g) return;
+    var m=new TriangleMarker([g[0],g[1]],{renderer:rend,radius:5.5,weight:1,
+      color:"#0a1a10",fillOpacity:.95,fillColor:"#3f9e6a"});
+    m.bindTooltip("USGS "+id+" "+esc(g[3]||"")+" | "+fmtN(Math.round(g[2]))+" km2",{sticky:true});
+    m.on("click",function(){ showBasin(id,m); });
+    gagG.addLayer(m);
+  });
+}
+function gagePopupHtml(id,basinDrawn){
+  var g=GAGES2[id]||[];
+  return "<b>USGS "+id+"</b><br>"+esc(g[3]||"(name not resolved)")+
+    "<br>Drainage area: "+fmtN(Math.round(g[2]||0))+" km2<br>HUC8 "+esc(g[4]||"-")+
+    "<br><a href='https://waterdata.usgs.gov/monitoring-location/"+id+"' target='_blank' rel='noopener'>NWIS page</a>"+
+    (basinDrawn?"<br><span class='desc'>Drainage basin drawn on the map (USGS NLDI).</span>":
+      (g[5]?"<br><span class='desc'>Loading the drainage basin...</span>":"<br><span class='desc'>No basin polygon available for this site.</span>"));
+}
+function showBasin(id,marker){
+  marker.bindPopup(gagePopupHtml(id,false),{maxWidth:300}).openPopup();
+  var g=GAGES2[id]; if(!g||!g[5]) return;
+  loadBasin(id).then(function(f){
+    if(!f||!SEL||(SEL.gages||[]).indexOf(id)<0) return;
+    basG.addLayer(L.geoJSON(f,{renderer:rend,style:{color:"#3f9e6a",weight:1.6,fillColor:"#3f9e6a",fillOpacity:.18}}));
+    raisePoints(); gagG.eachLayer(function(l){ if(l.bringToFront) l.bringToFront(); });
+    marker.setPopupContent(gagePopupHtml(id,true));
+  });
+}
+function loadBasin(id){
+  if(BCACHE[id]!==undefined) return Promise.resolve(BCACHE[id]);
+  return fetch("assets/data/basin/"+id+".json",{cache:"force-cache"}).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status); return r.json();
+  }).then(function(f){ BCACHE[id]=f; return f; }).catch(function(){ BCACHE[id]=null; return null; });
 }
 /* pts rows: ev [lat,lon,ts,deaths,dmg(,narrative,county,state)]
              lsr [lat,lon,ts,type,source(,remark,city,county)] */
@@ -520,6 +652,7 @@ function loadJson(e){
 }
 function applyJson(e,j){
   SELJ=j;
+  attachFlash(j);
   drawHucs(e,j);
   renderDetail(e,j);
 }
@@ -562,6 +695,12 @@ function hucPopup(lyr,code,name,h){
       html+="<tr><td>Peak "+d+" h accumulation</td><td>"+mm(m.max)+"</td></tr>";
       html+="<tr><td>Peak "+d+" h return period</td><td>"+yr(a.max)+"</td></tr>";
     });
+    if(h.fl){
+      html+="<tr><td>FLASH peak unit flow, CREST / SAC / HP</td><td>"+
+        [h.fl.crest,h.fl.sac,h.fl.hp].map(function(v){return isNum(v)?v.toFixed(1):"-";}).join(" / ")+"</td></tr>";
+      html+="<tr><td>Peak QPE/FFG ratio, max window</td><td>"+(isNum(h.fl.ffgmax)?h.fl.ffgmax.toFixed(2):"-")+"</td></tr>";
+      html+="<tr><td>Share above guidance</td><td>"+pct(h.fl.ffgmax_cov1)+"</td></tr>";
+    }
     var a=h["ari"+UI.dur]||{};
     if(a.cov){
       html+="<tr><td colspan=2 style='padding-top:5px'><b>Share of the watershed at or above, "+UI.dur+" h</b></td></tr>";
@@ -686,12 +825,60 @@ function renderDetail(e,j){
     html+="<div class='sec'>MRMS rainfall and return periods</div><div id='mrms-note' style='color:var(--dim);font-size:12px'>"+
       (e.has?"Loading the precomputed statistics...":(hasMRMS?"Not computed yet for this episode.":"Not built in this copy of the site."))+"</div>";
   }
+
+  /* FLASH models and guidance over the footprint (precompute_flash.py) */
+  if(j&&j.flash&&j.flash.fp){
+    var F=j.flash.fp;
+    html+="<div class='sec'>FLASH models <small>peak unit streamflow, m3/s/km2</small></div>";
+    html+="<table><tr><th>model</th><th class='n'>peak, any cell</th><th class='n'>at</th><th class='n'>mean of cell peaks</th></tr>";
+    MODEL_KEY.forEach(function(k,i){ var s=F[k]||{};
+      html+="<tr"+(i===UI.model?" style='color:var(--text)'":"")+"><td>"+MODEL_NAME[i]+"</td><td class='n'>"+
+        (isNum(s.max)?s.max.toFixed(1):"-")+"</td><td class='n' style='font-weight:400;color:var(--dim)'>"+(s.t?esc(String(s.t).slice(5)):"-")+
+        "</td><td class='n'>"+(isNum(s.mean_peak)?s.mean_peak.toFixed(2):"-")+"</td></tr>"; });
+    html+="</table>";
+    html+="<div class='sec'>Flash flood guidance <small>QPE/FFG ratio, 1.0 = rain reached the guidance</small></div>";
+    html+="<table><tr><th>window</th><th class='n'>peak ratio</th><th class='n'>at</th><th class='n'>share &ge; 1.0</th></tr>";
+    FFG_KEY.forEach(function(k,i){ var s=F[k]||{};
+      html+="<tr"+(i===UI.ffgdur?" style='color:var(--text)'":"")+"><td>"+FFG_NAME[i]+"</td><td class='n'>"+
+        (isNum(s.max)?s.max.toFixed(2):"-")+"</td><td class='n' style='font-weight:400;color:var(--dim)'>"+(s.t?esc(String(s.t).slice(5)):"-")+
+        "</td><td class='n'>"+pct(s.cov1)+"</td></tr>"; });
+    html+="</table>";
+    var fm=0; Object.keys(j.flash.missing||{}).forEach(function(k){ fm+=j.flash.missing[k]||0; });
+    html+="<div class='dq'>Read at the top of each of the "+j.flash.hours+" hours of the episode window, no lookback"+
+      (fm?("; "+fm+" product hour"+(fm>1?"s":"")+" missing from both archives"):"; all product hours found")+
+      ". The hydrophobic model only responds over burn scars.</div>";
+  }else if(hasFLASH){
+    html+="<div class='sec'>FLASH models and guidance</div><div style='color:var(--dim);font-size:12px'>"+
+      (j?"Not computed yet for this episode.":"Loading...")+"</div>";
+  }
+
+  /* USGS gages of the footprint */
+  if(HAVE_GAGES){
+    var gl=(e.gages||[]).map(function(id){ return [id,GAGES2[id]]; }).filter(function(p){return !!p[1];})
+      .sort(function(a,b){ return a[1][2]-b[1][2]; });
+    html+="<div class='sec'>USGS gages in the footprint <small>"+gl.length+" under 1000 km2</small></div>";
+    if(gl.length){
+      html+="<table><tr><th>station</th><th class='n'>area km2</th></tr>";
+      gl.forEach(function(p){ html+="<tr class='grow' data-g='"+p[0]+"'><td>"+p[0]+" "+esc(p[1][3]||"")+"</td><td class='n'>"+fmtN(Math.round(p[1][2]))+"</td></tr>"; });
+      html+="</table><div class='dq'>Click a row or a green triangle to see the station and its drainage basin.</div>";
+    }else{
+      html+="<div class='dq'>No RUNOFF gage drains a basin inside these watersheds.</div>";
+    }
+  }
   html+="<div class='btnrow'>"+
     "<button class='btn2 gold' id='dl-ep'>Download episode package</button>"+
     "<button class='btn2' id='zoom-ep'>Zoom to footprint</button></div>";
   d.innerHTML=html; d.hidden=false;
   el("zoom-ep").addEventListener("click",function(){ zoomTo(e,10); });
   el("dl-ep").addEventListener("click",function(){ downloadPackage(e,SELPTS,j); });
+  d.querySelectorAll("tr.grow").forEach(function(r){
+    r.addEventListener("click",function(){
+      var id=r.dataset.g, g=GAGES2[id]; if(!g) return;
+      var mk=null; gagG.eachLayer(function(l){ if(l.getLatLng&&Math.abs(l.getLatLng().lat-g[0])<1e-6&&Math.abs(l.getLatLng().lng-g[1])<1e-6) mk=l; });
+      map.setView([g[0],g[1]],Math.max(map.getZoom(),10));
+      if(mk) showBasin(id,mk);
+    });
+  });
   d.querySelectorAll("tr.hrow").forEach(function(r){
     r.addEventListener("click",function(){
       var code=r.dataset.h, lyr=HUCLAYERS[code];
@@ -755,6 +942,28 @@ function downloadPackage(e,pts,j){
     zip.file(dir+"hourly_footprint.csv",toCsv(["hour_utc","rain_mean_mm","rain_max_mm","ari1h_max_yr"],j.series||[]));
     zip.file(dir+"episode_mrms.json",JSON.stringify(j));
   }
+  /* FLASH models and guidance, episode window only */
+  if(j&&j.flash&&j.flash.fp){
+    var F=j.flash, keys=MODEL_KEY.concat(FFG_KEY);
+    var fh=["unit","code"]; keys.forEach(function(k){ fh.push(k+"_peak",k+"_peak_time_utc",k+"_mean_of_cell_peaks"); });
+    FFG_KEY.forEach(function(k){ fh.push(k+"_share_ge1"); });
+    var frow=[["footprint_huc8_union",""]];
+    keys.forEach(function(k){ var s=F.fp[k]||{}; frow[0].push(s.max,s.t||"",s.mean_peak); });
+    FFG_KEY.forEach(function(k){ frow[0].push((F.fp[k]||{}).cov1); });
+    zip.file(dir+"flash_footprint.csv",toCsv(fh,frow));
+    var hkeys=keys.concat(["ffgmax_cov1"]);
+    var hrows2=(j.huc8||[]).map(function(h){ var s=(F.huc8||{})[h.h]||{}; var r=[h.n,h.h]; hkeys.forEach(function(k){ r.push(s[k]); }); return r; });
+    zip.file(dir+"flash_huc8.csv",toCsv(["watershed","huc8"].concat(hkeys.map(function(k){return k==="ffgmax_cov1"?"ffgmax_share_ge1":k+"_peak";})),hrows2));
+    zip.file(dir+"flash_hourly.csv",toCsv(F.series_fields||[],F.series||[]));
+    summary.flash={products:F.products, units:F.units, hours:F.hours, footprint:F.fp, missing:F.missing, definition:F.definition};
+    zip.file(dir+"episode_summary.json",JSON.stringify(summary,null,2));
+  }
+  /* USGS gages of the footprint and their drainage basins */
+  var gageIds=(HAVE_GAGES?(e.gages||[]):[]).filter(function(id){ return !!GAGES2[id]; });
+  if(gageIds.length){
+    zip.file(dir+"gages.csv",toCsv(["site_no","station_name","lat","lon","drainage_area_km2","huc8","basin_polygon"],
+      gageIds.map(function(id){ var g=GAGES2[id]; return [id,g[3],g[0],g[1],g[2],g[4],g[5]?"yes":"no"]; })));
+  }
   zip.file(dir+"README.md",
     "# RUNOFF episode "+e.id+"\n\n"+
     "Weather-caused flash flood episode, "+e.t0+" to "+e.t1+" UTC ("+(e.states||"-")+").\n\n"+
@@ -765,6 +974,10 @@ function downloadPackage(e,pts,j){
     "- footprint_stats.csv: MRMS statistics for the watershed union and for the reporting counties\n"+
     "- huc8_stats.csv: the same statistics per HUC8 watershed, with event and LSR counts\n"+
     "- hourly_footprint.csv: hourly footprint mean and maximum rain and maximum 1 h ARI\n"+
+    "- flash_footprint.csv, flash_huc8.csv, flash_hourly.csv: NSSL FLASH products over the episode window only:\n"+
+    "  CREST, SAC-SMA and hydrophobic peak unit streamflow (m3/s/km2) and the QPE/FFG ratio for 1, 3, 6 h and the max window\n"+
+    "  (peak at any cell with its hour, area weighted mean of the cell peaks, share of the area whose peak ratio reached 1.0)\n"+
+    "- gages.csv: RUNOFF USGS gages (under 1000 km2) whose HUC8 lies in the footprint; basins.geojson: their drainage basins (USGS NLDI)\n"+
     "- episode_mrms.json: the complete precomputed record as published on the site\n\n"+
     "Definitions:\n"+
     "- rain: MRMS MultiSensor QPE 1 h Pass 2 (gauge corrected); Pass 1 or radar only where Pass 2 is absent (see qpe_files)\n"+
@@ -777,7 +990,13 @@ function downloadPackage(e,pts,j){
     "  or 10 km2, or holding a report\n\n"+
     "Event coordinates are report locations, not storm centers; use the footprint\n"+
     "and the MRMS fields to characterize the storm itself.\n");
-  zip.generateAsync({type:"blob"}).then(function(blob){
+  /* drainage basins are fetched per gage (small files); missing ones are skipped */
+  var basinIds=gageIds.filter(function(id){ return GAGES2[id][5]; });
+  Promise.all(basinIds.map(loadBasin)).then(function(feats){
+    feats=feats.filter(Boolean);
+    if(feats.length) zip.file(dir+"basins.geojson",JSON.stringify({type:"FeatureCollection",features:feats}));
+    return zip.generateAsync({type:"blob"});
+  }).then(function(blob){
     var a=document.createElement("a");
     a.href=URL.createObjectURL(blob);
     a.download="runoff_episode_"+e.id+".zip";
@@ -795,6 +1014,8 @@ el("ly-cty").addEventListener("change",function(e){
   e.target.checked?ctyG.addTo(map):map.removeLayer(ctyG); });
 el("ly-ev").addEventListener("change",function(e){
   e.target.checked?evG.addTo(map):map.removeLayer(evG); });
+el("ly-gag").addEventListener("change",function(e){
+  if(e.target.checked){ gagG.addTo(map); basG.addTo(map); } else { map.removeLayer(gagG); map.removeLayer(basG); } });
 el("ly-lsr").addEventListener("change",function(e){
   e.target.checked?lsrG.addTo(map):map.removeLayer(lsrG); });
 
@@ -804,8 +1025,11 @@ el("reset-all").addEventListener("click",function(){
   [["f-ev","v-ev",function(v){return String(v);}],["f-lsr","v-lsr",function(v){return String(v);}],
    ["f-death","v-death",function(v){return String(v);}],["f-dmg","v-dmg",function(v){return fmt$(dmgFromSlider(v));}],
    ["f-mmax","v-mmax",function(v){return v+" mm";}],["f-rmean","v-rmean",function(v){return v+" mm";}],
-   ["f-cov","v-cov",function(v){return v+" %";}],["f-amax","v-amax",function(v){return v<=0?"any":(">= "+v+" yr");}]
+   ["f-cov","v-cov",function(v){return v+" %";}],["f-amax","v-amax",function(v){return v<=0?"any":(">= "+v+" yr");}],
+   ["f-ng","v-ng",function(v){return String(v);}],["f-ffg","v-ffg",function(){return "any";}],
+   ["f-ffgcov","v-ffgcov",function(v){return v+" %";}]
   ].forEach(function(t){ el(t[0]).value=0; el(t[1]).textContent=t[2](0); });
+  el("f-uqmin").value=0; el("f-uqmax").value=20; uqLabel();
   el("f-only").checked=false;
   refresh();
 });
