@@ -65,7 +65,7 @@ def build():
         gg = pd.read_csv(GAGES_CSV, dtype={"id": str, "huc8": str})
         gages_by_huc = {h: sorted(g.id) for h, g in gg.groupby("huc8")}
     thresholds = None
-    rows, n_done, n_flash = [], 0, 0
+    rows, n_done, n_flash, n_legacy = [], 0, 0, 0
     for r in cat["rows"]:
         eid = int(r[fi["id"]])
         base = [r[fi[f]] for f in BASE_FIELDS]
@@ -79,11 +79,19 @@ def build():
             fl = d.get("flash")
             if fl and fl.get("fp"):
                 ffp = fl["fp"]
+                # records written before the percent fix hold the QPE/FFG ratio x100 and a
+                # coverage computed against the wrong threshold; rescale, drop the coverage
+                legacy = fl.get("ffg_scale") != "ratio"
+                scale = 0.01 if legacy else 1.0
                 new[11] = [(ffp.get(k) or {}).get("max") for k in ("crest", "sac", "hp")]
-                new[12] = [(ffp.get(k) or {}).get("max") for k in ("ffg1", "ffg3", "ffg6", "ffgmax")]
-                c1 = (ffp.get("ffgmax") or {}).get("cov1")
+                new[12] = [None if (ffp.get(k) or {}).get("max") is None else
+                           round((ffp.get(k) or {}).get("max") * scale, 3)
+                           for k in ("ffg1", "ffg3", "ffg6", "ffgmax")]
+                c1 = None if legacy else (ffp.get("ffgmax") or {}).get("cov1")
                 new[12].append(int(round(c1 * 1000)) if c1 is not None else None)
                 n_flash += 1
+                if legacy:
+                    n_legacy += 1
             fp = d.get("fp", {})
             if thresholds is None:
                 thresholds = d.get("ari", {}).get("thresholds")
@@ -116,6 +124,10 @@ def build():
     sz = (SITE_DATA / "episodes.js").stat().st_size / 1e6
     print(f"episodes.js rewritten: {len(rows)} episodes, {n_done} with MRMS statistics, "
           f"{n_flash} with FLASH products, gages {'yes' if gages_by_huc else 'no'}, {sz:.2f} MB")
+    if n_legacy:
+        print(f"note: {n_legacy} FLASH records are from before the percent fix; their QPE/FFG "
+              f"ratios were rescaled and their guidance coverage left empty. Rerun "
+              f"engine/episodes/precompute_flash.py --force to recompute them.")
     return n_done
 
 

@@ -163,6 +163,13 @@ venv.bak/
 # raw archives staged by the episode engine (large; rebuildable)
 data/lsr/
 data/stormevents/
+# storm_episodes/ (the modeling dataset) is committed; only its zip and the
+# scratch files the quickstart notebook writes are not
+storm_episodes.zip
+storm_episodes/notebooks/my_subset/
+storm_episodes/notebooks/*.geojson
+storm_episodes/notebooks/gages_for_nextgen.csv
+my_subset/
 
 # Spyder project settings
 .spyderproject

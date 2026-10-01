@@ -14,6 +14,11 @@ HUC8:
     HP_MAXUNITSTREAMFLOW      hydrophobic (burn scar) model
   QPE to flash flood guidance ratio (1.0 = rainfall reached the guidance):
     QPE_FFG01H, QPE_FFG03H, QPE_FFG06H, QPE_FFGMAX
+    The archived GRIB2 fields hold the ratio in PERCENT (integers, capped at 1000);
+    they are divided by 100 on ingest so every stored value is a ratio, and the
+    record carries "ffg_scale": "ratio" to say so. Records without that marker
+    (written by the first version of this script) are still in percent, and
+    build_mrms_payload.py / export_dataset.py rescale them on the fly.
 
 Per product: the episode peak at any cell (with its hour), the area weighted mean
 of the per cell peak, the hourly footprint maximum and mean (series), and for the
@@ -202,6 +207,7 @@ class FlashEpisode:
             "products": {k: PRODUCTS[k][0] for k in PRODUCTS},
             "labels": LABELS,
             "units": {"uq": "m3/s/km2", "ffg": "ratio (1.0 = rainfall reached the guidance)"},
+            "ffg_scale": "ratio",
             "missing": self.missing, "sources": self.sources,
             "fp": fp, "huc8": hucs,
             "series_fields": ["hour"] + [f"{k}_{s}" for k in PRODUCTS for s in ("max", "mean")],
@@ -324,6 +330,8 @@ def main() -> None:
             for k, (raw, R, E, D) in grids.items():
                 v = to_values(raw[r0:r1, c0:c1], R, E, D)
                 v[v < 0] = np.nan
+                if PRODUCTS[k][1] == "ffg":
+                    v = v / 100.0          # archived as percent; keep ratios everywhere
                 crops[k] = v
             e.take(h, crops, sources)
             if h == e.h_last:

@@ -153,7 +153,7 @@ convention = "numpy"
 "docs/*" = ["I"]
 "tests/*" = ["D"]
 "*/__init__.py" = ["F401"]
-"*.ipynb" = ["E402", "E501", "F401", "F811", "F841", "T201", "D103", "BLE001"]
+"*.ipynb" = ["E401", "E402", "E501", "E701", "E702", "E703", "F401", "F811", "F841", "T201", "D103", "BLE001"]
 
 [tool.ruff.format]
 quote-style = "preserve"

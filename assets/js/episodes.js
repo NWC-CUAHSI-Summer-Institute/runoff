@@ -499,7 +499,18 @@ function metricOf(h,k){   /* h = huc8 entry of the episode JSON */
 }
 function attachFlash(j){   /* hang the per HUC8 FLASH record on each watershed entry */
   if(!j||!j.huc8) return;
-  var fh=(j.flash&&j.flash.huc8)||{};
+  var F=j.flash;
+  if(F && F.ffg_scale!=="ratio" && !F._rescaled){
+    /* record from before the percent fix: QPE/FFG values are x100 and the
+       guidance coverage was computed against the wrong threshold */
+    FFG_KEY.forEach(function(k){ var s=F.fp&&F.fp[k]; if(s){ if(isNum(s.max)) s.max/=100; if(isNum(s.mean_peak)) s.mean_peak/=100; s.cov1=null; } });
+    Object.keys(F.huc8||{}).forEach(function(c){ var s=F.huc8[c];
+      FFG_KEY.forEach(function(k){ if(isNum(s[k])) s[k]/=100; }); s.ffgmax_cov1=null; });
+    var fi=(F.series_fields||[]).map(function(n){ return /^ffg/.test(n); });
+    (F.series||[]).forEach(function(r){ for(var i=0;i<r.length;i++) if(fi[i]&&isNum(r[i])) r[i]/=100; });
+    F._rescaled=true;
+  }
+  var fh=(F&&F.huc8)||{};
   j.huc8.forEach(function(h){ h.fl=fh[h.h]||null; });
 }
 el("sel-metric").addEventListener("change",function(){ renderDots(); renderLegend(); redrawSelection(); });

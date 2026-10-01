@@ -47,6 +47,19 @@ once, here, and published as static files.
     #    calls it at the end)
     python engine/episodes/build_mrms_payload.py
 
+    # 8. the modeling dataset: one folder of flat tables (Parquet + CSV) with a
+    #    README and data dictionary, and a single zip to hand to modelers (seconds)
+    python engine/episodes/export_dataset.py --zip
+
+    # 9. per-HUC8 attributes from a raster (radar coverage, beam height, RQI):
+    #    zonal mean/min/max/share per watershed, then re-export. radar_cov.tif is
+    #    the 0.01 degree percent-coverage grid kept under data/geo (not committed)
+    python engine/episodes/huc8_radar_coverage.py --raster data/geo/radar_cov.tif --threshold 50 100
+    python engine/episodes/export_dataset.py --zip
+
+    # 10. re-execute the tour notebook so its outputs match the data
+    cd storm_episodes/notebooks && jupyter nbconvert --to notebook --execute --inplace quickstart.ipynb
+
 Step 1 is optional: without it the catalog is built with LSRs marked "not
 fetched" and the LSR filter is hidden. Without steps 3 to 5 the rainfall
 filters stay hidden and the detail card says the statistics are not built.
@@ -133,6 +146,15 @@ per episode JSON.
     data/episodes/mrms_run.log           one line per hour read (product, source, misses)
     data/geo/huc8_wbd.geojson            USGS WBD HUC8 for local geoprocessing (gitignored)
     assets/data/ep/<id>.json             per episode statistics (published, fetched on click)
+    storm_episodes/                      the modeling dataset (export_dataset.py), committed:
+                                         data/ with episodes, episode_huc8 (one row per watershed
+                                         per episode, with the label "flooded"), events, lsrs,
+                                         hourly, huc8, gages, episode_gages as Parquet and CSV;
+                                         README.md; DATA_DICTIONARY.csv; notebooks/quickstart.ipynb
+                                         (executed tour). --zip also writes storm_episodes.zip for
+                                         a GitHub Release.
+    data/episodes/huc8_attributes.csv    per-HUC8 radar coverage (huc8_radar_coverage.py on
+                                         radar_cov.tif), joined into huc8 and episode_huc8
     assets/data/episodes.js              site payload, var EPCAT
     assets/data/episode_points.js        site payload, var EPPTS
     assets/data/rep/<id>.json            narratives per episode (fetched on click): the NWS

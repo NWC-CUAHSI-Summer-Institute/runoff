@@ -1,0 +1,255 @@
+table,column,dtype,description
+episodes,episode_id,int64,NOAA Storm Events EPISODE_ID
+episodes,begin_utc,str,"episode start, UTC, truncated to the hour"
+episodes,end_utc,str,"episode end, UTC, truncated to the hour"
+episodes,duration_h,float64,"end minus begin, hours"
+episodes,states,str,"states with reports, comma separated"
+episodes,n_events,int64,Storm Events flash flood reports in the episode
+episodes,n_lsr,int64,Local Storm Reports matched to the episode
+episodes,fatalities,int64,"direct plus indirect deaths, Storm Events"
+episodes,injuries,int64,"direct plus indirect injuries, Storm Events"
+episodes,damage_usd,int64,"property plus crop damage, US dollars, NWS estimates"
+episodes,n_counties,int64,counties with reports
+episodes,county_fips,str,"county FIPS codes, semicolon separated"
+episodes,n_huc8,int64,watersheds in the footprint
+episodes,huc8_list,str,"HUC8 codes of the footprint, semicolon separated"
+episodes,footprint_km2,float64,"area of the footprint (union of the HUC8), km2"
+episodes,n_gages,int64,RUNOFF USGS gages inside the footprint
+episodes,min_lat,float64,bounding box of the report coordinates
+episodes,min_lon,float64,bounding box of the report coordinates
+episodes,max_lat,float64,bounding box of the report coordinates
+episodes,max_lon,float64,bounding box of the report coordinates
+episodes,mrms_hours,int64,hourly QPE fields in the window (start to end + 1 h)
+episodes,qpe_products,str,"QPE product used per hour count, pass2/pass1/radar (@aws = AWS fallback)"
+episodes,qpe_missing_hours,int64,window hours with no QPE in either archive
+episodes,ari_missing_duration_hours,int64,ARI duration-hours missing from the archives
+episodes,artifact_cells,int64,cells removed as radar artifacts (persistent hot cells)
+episodes,artifact_cells_in_footprint,int64,of which inside the footprint
+episodes,rain_ep_mean_mm,float64,"episode rain, area weighted mean of the unit, mm"
+episodes,rain_ep_max_mm,float64,"episode rain, wettest cell of the unit, mm"
+episodes,rain_pre5h_mean_mm,float64,"rain in the 5 h before the start, unit mean, mm"
+episodes,rain_pre5h_max_mm,float64,"rain in the 5 h before the start, wettest cell, mm"
+episodes,max1h_peak_mm,float64,"highest rolling 1 h accumulation reached by any cell of the unit, mm"
+episodes,max1h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 1 h accumulations, mm"
+episodes,max1h_peak_time_utc,str,"hour (UTC, window end) of the unit peak 1 h accumulation"
+episodes,max3h_peak_mm,float64,"highest rolling 3 h accumulation reached by any cell of the unit, mm"
+episodes,max3h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 3 h accumulations, mm"
+episodes,max3h_peak_time_utc,str,"hour (UTC, window end) of the unit peak 3 h accumulation"
+episodes,max6h_peak_mm,float64,"highest rolling 6 h accumulation reached by any cell of the unit, mm"
+episodes,max6h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 6 h accumulations, mm"
+episodes,max6h_peak_time_utc,str,"hour (UTC, window end) of the unit peak 6 h accumulation"
+episodes,ari1h_peak_yr,float64,"maximum FLASH 1 h ARI at any cell during the episode, years (capped at 200)"
+episodes,ari1h_valid_frac,float64,share of the unit area with a valid 1 h ARI value
+episodes,ari1h_cov_ge1yr,float64,share of the unit area whose 1 h ARI reached 1 years at any hour
+episodes,ari1h_cov_ge2yr,float64,share of the unit area whose 1 h ARI reached 2 years at any hour
+episodes,ari1h_cov_ge5yr,float64,share of the unit area whose 1 h ARI reached 5 years at any hour
+episodes,ari1h_cov_ge10yr,float64,share of the unit area whose 1 h ARI reached 10 years at any hour
+episodes,ari1h_cov_ge20yr,float64,share of the unit area whose 1 h ARI reached 20 years at any hour
+episodes,ari1h_cov_ge25yr,float64,share of the unit area whose 1 h ARI reached 25 years at any hour
+episodes,ari1h_cov_ge50yr,float64,share of the unit area whose 1 h ARI reached 50 years at any hour
+episodes,ari1h_cov_ge100yr,float64,share of the unit area whose 1 h ARI reached 100 years at any hour
+episodes,ari1h_cov_ge200yr,float64,share of the unit area whose 1 h ARI reached 200 years at any hour
+episodes,ari3h_peak_yr,float64,"maximum FLASH 3 h ARI at any cell during the episode, years (capped at 200)"
+episodes,ari3h_valid_frac,float64,share of the unit area with a valid 3 h ARI value
+episodes,ari3h_cov_ge1yr,float64,share of the unit area whose 3 h ARI reached 1 years at any hour
+episodes,ari3h_cov_ge2yr,float64,share of the unit area whose 3 h ARI reached 2 years at any hour
+episodes,ari3h_cov_ge5yr,float64,share of the unit area whose 3 h ARI reached 5 years at any hour
+episodes,ari3h_cov_ge10yr,float64,share of the unit area whose 3 h ARI reached 10 years at any hour
+episodes,ari3h_cov_ge20yr,float64,share of the unit area whose 3 h ARI reached 20 years at any hour
+episodes,ari3h_cov_ge25yr,float64,share of the unit area whose 3 h ARI reached 25 years at any hour
+episodes,ari3h_cov_ge50yr,float64,share of the unit area whose 3 h ARI reached 50 years at any hour
+episodes,ari3h_cov_ge100yr,float64,share of the unit area whose 3 h ARI reached 100 years at any hour
+episodes,ari3h_cov_ge200yr,float64,share of the unit area whose 3 h ARI reached 200 years at any hour
+episodes,ari6h_peak_yr,float64,"maximum FLASH 6 h ARI at any cell during the episode, years (capped at 200)"
+episodes,ari6h_valid_frac,float64,share of the unit area with a valid 6 h ARI value
+episodes,ari6h_cov_ge1yr,float64,share of the unit area whose 6 h ARI reached 1 years at any hour
+episodes,ari6h_cov_ge2yr,float64,share of the unit area whose 6 h ARI reached 2 years at any hour
+episodes,ari6h_cov_ge5yr,float64,share of the unit area whose 6 h ARI reached 5 years at any hour
+episodes,ari6h_cov_ge10yr,float64,share of the unit area whose 6 h ARI reached 10 years at any hour
+episodes,ari6h_cov_ge20yr,float64,share of the unit area whose 6 h ARI reached 20 years at any hour
+episodes,ari6h_cov_ge25yr,float64,share of the unit area whose 6 h ARI reached 25 years at any hour
+episodes,ari6h_cov_ge50yr,float64,share of the unit area whose 6 h ARI reached 50 years at any hour
+episodes,ari6h_cov_ge100yr,float64,share of the unit area whose 6 h ARI reached 100 years at any hour
+episodes,ari6h_cov_ge200yr,float64,share of the unit area whose 6 h ARI reached 200 years at any hour
+episodes,crest_peak_m3s_km2,float64,"episode peak CREST unit streamflow at any cell, m3/s/km2"
+episodes,crest_mean_of_peaks_m3s_km2,float64,area weighted mean of the cell peak CREST unit streamflow
+episodes,crest_peak_time_utc,str,"hour of the CREST peak, UTC"
+episodes,sac_peak_m3s_km2,float64,"episode peak SAC-SMA unit streamflow at any cell, m3/s/km2"
+episodes,sac_mean_of_peaks_m3s_km2,float64,area weighted mean of the cell peak SAC-SMA unit streamflow
+episodes,sac_peak_time_utc,str,"hour of the SAC-SMA peak, UTC"
+episodes,hp_peak_m3s_km2,float64,"episode peak hydrophobic unit streamflow at any cell, m3/s/km2"
+episodes,hp_mean_of_peaks_m3s_km2,float64,area weighted mean of the cell peak hydrophobic unit streamflow
+episodes,hp_peak_time_utc,str,"hour of the hydrophobic peak, UTC"
+episodes,ffg1h_peak_ratio,float64,peak QPE/FFG ratio (1 h) at any cell during the episode; 1.0 = rain reached the guidance
+episodes,ffg1h_mean_of_peaks_ratio,float64,area weighted mean of the cell peak QPE/FFG ratios (1 h)
+episodes,ffg1h_peak_time_utc,str,"hour of the peak QPE/FFG ratio (1 h), UTC"
+episodes,ffg1h_share_ge1,float64,share of the unit area whose peak QPE/FFG ratio (1 h) reached 1.0
+episodes,ffg3h_peak_ratio,float64,peak QPE/FFG ratio (3 h) at any cell during the episode; 1.0 = rain reached the guidance
+episodes,ffg3h_mean_of_peaks_ratio,float64,area weighted mean of the cell peak QPE/FFG ratios (3 h)
+episodes,ffg3h_peak_time_utc,str,"hour of the peak QPE/FFG ratio (3 h), UTC"
+episodes,ffg3h_share_ge1,float64,share of the unit area whose peak QPE/FFG ratio (3 h) reached 1.0
+episodes,ffg6h_peak_ratio,float64,peak QPE/FFG ratio (6 h) at any cell during the episode; 1.0 = rain reached the guidance
+episodes,ffg6h_mean_of_peaks_ratio,float64,area weighted mean of the cell peak QPE/FFG ratios (6 h)
+episodes,ffg6h_peak_time_utc,str,"hour of the peak QPE/FFG ratio (6 h), UTC"
+episodes,ffg6h_share_ge1,float64,share of the unit area whose peak QPE/FFG ratio (6 h) reached 1.0
+episodes,ffgmax_peak_ratio,float64,peak QPE/FFG ratio (max window) at any cell during the episode; 1.0 = rain reached the guidance
+episodes,ffgmax_mean_of_peaks_ratio,float64,area weighted mean of the cell peak QPE/FFG ratios (max window)
+episodes,ffgmax_peak_time_utc,str,"hour of the peak QPE/FFG ratio (max window), UTC"
+episodes,ffgmax_share_ge1,float64,share of the unit area whose peak QPE/FFG ratio (max window) reached 1.0
+episodes,flash_hours,int64,hours of FLASH products read (window only)
+episodes,flash_missing_product_hours,int64,FLASH product-hours missing from the archives
+episodes,flash_legacy_scale,int64,"1 if the FLASH record predates the percent fix (ratios rescaled, coverage empty)"
+episodes,episode_narrative,str,"NWS narrative of the whole episode, Storm Events"
+episode_huc8,episode_id,int64,NOAA Storm Events EPISODE_ID
+episode_huc8,huc8,object,"8 digit hydrologic unit code (USGS WBD), string with leading zero"
+episode_huc8,huc8_name,str,watershed name (WBD)
+episode_huc8,states,str,states the watershed spans (WBD)
+episode_huc8,huc8_area_km2,float64,"watershed area, km2"
+episode_huc8,inside_counties_km2,float64,"area of the watershed inside the reporting counties, km2"
+episode_huc8,inside_counties_frac,float64,share of the watershed inside the reporting counties
+episode_huc8,share_of_footprint,float64,share of the county union that this watershed covers
+episode_huc8,flooded,int64,label: 1 if any Storm Events report or LSR fell inside the watershed during the episode
+episode_huc8,n_reports,int64,n_events + n_lsr
+episode_huc8,n_events,int64,Storm Events reports inside the watershed
+episode_huc8,n_lsr,int64,Local Storm Reports inside the watershed
+episode_huc8,fatalities,float64,deaths of the reports inside the watershed (empty if reports were not assigned)
+episode_huc8,injuries,float64,injuries of the reports inside the watershed
+episode_huc8,damage_usd,float64,"damage of the reports inside the watershed, US dollars"
+episode_huc8,n_gages,int64,RUNOFF USGS gages in the watershed
+episode_huc8,gage_ids,str,"their site numbers, semicolon separated"
+episode_huc8,radar_coverage_at_reports_mean,float64,mean of radar_coverage_at_report over the reports inside the watershed during the episode (empty when none)
+episode_huc8,rain_ep_mean_mm,float64,"episode rain, area weighted mean of the unit, mm"
+episode_huc8,rain_ep_max_mm,float64,"episode rain, wettest cell of the unit, mm"
+episode_huc8,rain_pre5h_mean_mm,float64,"rain in the 5 h before the start, unit mean, mm"
+episode_huc8,rain_pre5h_max_mm,float64,"rain in the 5 h before the start, wettest cell, mm"
+episode_huc8,max1h_peak_mm,float64,"highest rolling 1 h accumulation reached by any cell of the unit, mm"
+episode_huc8,max1h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 1 h accumulations, mm"
+episode_huc8,max3h_peak_mm,float64,"highest rolling 3 h accumulation reached by any cell of the unit, mm"
+episode_huc8,max3h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 3 h accumulations, mm"
+episode_huc8,max6h_peak_mm,float64,"highest rolling 6 h accumulation reached by any cell of the unit, mm"
+episode_huc8,max6h_mean_of_peaks_mm,float64,"area weighted mean of the cell peak rolling 6 h accumulations, mm"
+episode_huc8,ari1h_peak_yr,float64,"maximum FLASH 1 h ARI at any cell during the episode, years (capped at 200)"
+episode_huc8,ari1h_valid_frac,float64,share of the unit area with a valid 1 h ARI value
+episode_huc8,ari1h_cov_ge1yr,float64,share of the unit area whose 1 h ARI reached 1 years at any hour
+episode_huc8,ari1h_cov_ge2yr,float64,share of the unit area whose 1 h ARI reached 2 years at any hour
+episode_huc8,ari1h_cov_ge5yr,float64,share of the unit area whose 1 h ARI reached 5 years at any hour
+episode_huc8,ari1h_cov_ge10yr,float64,share of the unit area whose 1 h ARI reached 10 years at any hour
+episode_huc8,ari1h_cov_ge20yr,float64,share of the unit area whose 1 h ARI reached 20 years at any hour
+episode_huc8,ari1h_cov_ge25yr,float64,share of the unit area whose 1 h ARI reached 25 years at any hour
+episode_huc8,ari1h_cov_ge50yr,float64,share of the unit area whose 1 h ARI reached 50 years at any hour
+episode_huc8,ari1h_cov_ge100yr,float64,share of the unit area whose 1 h ARI reached 100 years at any hour
+episode_huc8,ari1h_cov_ge200yr,float64,share of the unit area whose 1 h ARI reached 200 years at any hour
+episode_huc8,ari3h_peak_yr,float64,"maximum FLASH 3 h ARI at any cell during the episode, years (capped at 200)"
+episode_huc8,ari3h_valid_frac,float64,share of the unit area with a valid 3 h ARI value
+episode_huc8,ari3h_cov_ge1yr,float64,share of the unit area whose 3 h ARI reached 1 years at any hour
+episode_huc8,ari3h_cov_ge2yr,float64,share of the unit area whose 3 h ARI reached 2 years at any hour
+episode_huc8,ari3h_cov_ge5yr,float64,share of the unit area whose 3 h ARI reached 5 years at any hour
+episode_huc8,ari3h_cov_ge10yr,float64,share of the unit area whose 3 h ARI reached 10 years at any hour
+episode_huc8,ari3h_cov_ge20yr,float64,share of the unit area whose 3 h ARI reached 20 years at any hour
+episode_huc8,ari3h_cov_ge25yr,float64,share of the unit area whose 3 h ARI reached 25 years at any hour
+episode_huc8,ari3h_cov_ge50yr,float64,share of the unit area whose 3 h ARI reached 50 years at any hour
+episode_huc8,ari3h_cov_ge100yr,float64,share of the unit area whose 3 h ARI reached 100 years at any hour
+episode_huc8,ari3h_cov_ge200yr,float64,share of the unit area whose 3 h ARI reached 200 years at any hour
+episode_huc8,ari6h_peak_yr,float64,"maximum FLASH 6 h ARI at any cell during the episode, years (capped at 200)"
+episode_huc8,ari6h_valid_frac,float64,share of the unit area with a valid 6 h ARI value
+episode_huc8,ari6h_cov_ge1yr,float64,share of the unit area whose 6 h ARI reached 1 years at any hour
+episode_huc8,ari6h_cov_ge2yr,float64,share of the unit area whose 6 h ARI reached 2 years at any hour
+episode_huc8,ari6h_cov_ge5yr,float64,share of the unit area whose 6 h ARI reached 5 years at any hour
+episode_huc8,ari6h_cov_ge10yr,float64,share of the unit area whose 6 h ARI reached 10 years at any hour
+episode_huc8,ari6h_cov_ge20yr,float64,share of the unit area whose 6 h ARI reached 20 years at any hour
+episode_huc8,ari6h_cov_ge25yr,float64,share of the unit area whose 6 h ARI reached 25 years at any hour
+episode_huc8,ari6h_cov_ge50yr,float64,share of the unit area whose 6 h ARI reached 50 years at any hour
+episode_huc8,ari6h_cov_ge100yr,float64,share of the unit area whose 6 h ARI reached 100 years at any hour
+episode_huc8,ari6h_cov_ge200yr,float64,share of the unit area whose 6 h ARI reached 200 years at any hour
+episode_huc8,crest_peak_m3s_km2,float64,"episode peak CREST unit streamflow at any cell, m3/s/km2"
+episode_huc8,sac_peak_m3s_km2,float64,"episode peak SAC-SMA unit streamflow at any cell, m3/s/km2"
+episode_huc8,hp_peak_m3s_km2,float64,"episode peak hydrophobic unit streamflow at any cell, m3/s/km2"
+episode_huc8,ffg1h_peak_ratio,float64,peak QPE/FFG ratio (1 h) at any cell during the episode; 1.0 = rain reached the guidance
+episode_huc8,ffg3h_peak_ratio,float64,peak QPE/FFG ratio (3 h) at any cell during the episode; 1.0 = rain reached the guidance
+episode_huc8,ffg6h_peak_ratio,float64,peak QPE/FFG ratio (6 h) at any cell during the episode; 1.0 = rain reached the guidance
+episode_huc8,ffgmax_peak_ratio,float64,peak QPE/FFG ratio (max window) at any cell during the episode; 1.0 = rain reached the guidance
+episode_huc8,ffgmax_share_ge1,float64,share of the watershed whose peak QPE/FFG ratio (max window) reached 1.0
+episode_huc8,radar_coverage_mean,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: area weighted mean, percent"
+episode_huc8,radar_coverage_min,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: lowest pixel, percent"
+episode_huc8,radar_coverage_max,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: highest pixel, percent"
+episode_huc8,radar_coverage_valid_frac,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed inside the raster (0 = open water or outside the lower 48)"
+episode_huc8,radar_coverage_frac_ge50,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed area with a value at or above 50 percent"
+episode_huc8,radar_coverage_frac_ge100,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed area with a value at or above 100 percent"
+events,episode_id,int64,NOAA Storm Events EPISODE_ID
+events,event_id,int64,NOAA Storm Events EVENT_ID
+events,huc8,string,"8 digit hydrologic unit code (USGS WBD), string with leading zero"
+events,state,str,state abbreviation
+events,county_fips,str,county FIPS of the report
+events,county_name,str,county name
+events,begin_utc,str,"report begin, UTC"
+events,end_utc,str,"report end, UTC"
+events,lat,float64,"report location (NWS begin coordinates), not the storm center"
+events,lon,float64,"report location (NWS begin coordinates), not the storm center"
+events,fatalities,int64,direct plus indirect deaths of this report
+events,injuries,int64,direct plus indirect injuries of this report
+events,damage_usd,float64,"property plus crop damage of this report, US dollars"
+events,flood_cause,str,"NWS flood cause (heavy rain, tropical system, burn area, snowmelt, ice jam)"
+events,radar_coverage_at_report,float64,hydrologic radar coverage at the report location: percent of the drainage area upstream of that point covered by weather radar
+events,narrative,str,"NWS event narrative, Storm Events"
+lsrs,episode_id,int64,NOAA Storm Events EPISODE_ID
+lsrs,huc8,string,"8 digit hydrologic unit code (USGS WBD), string with leading zero"
+lsrs,valid_utc,str,"report time, UTC"
+lsrs,lat,float64,report location
+lsrs,lon,float64,report location
+lsrs,typetext,str,LSR type (FLASH FLOOD)
+lsrs,source,str,"who reported (trained spotter, law enforcement, public, ...)"
+lsrs,wfo,str,issuing NWS office
+lsrs,county_fips,str,"county FIPS from the UGC code, empty if the report had none"
+lsrs,county,str,county name as reported
+lsrs,city,str,place text as reported
+lsrs,radar_coverage_at_report,float64,hydrologic radar coverage at the report location: percent of the drainage area upstream of that point covered by weather radar
+lsrs,narrative,str,LSR remark
+hourly,episode_id,int64,NOAA Storm Events EPISODE_ID
+hourly,hour_utc,str,"valid hour, UTC; the QPE hour covers (h-1, h]"
+hourly,rain_mean_mm,float64,"footprint mean of the hourly QPE, mm"
+hourly,rain_max_mm,float64,"footprint maximum of the hourly QPE, mm"
+hourly,ari1h_max_yr,float64,"footprint maximum of the 1 h ARI at that hour, years"
+hourly,crest_max,float64,"footprint maximum CREST unit streamflow, m3/s/km2"
+hourly,crest_mean,float64,"footprint mean CREST unit streamflow, m3/s/km2"
+hourly,sac_max,float64,footprint maximum SAC-SMA unit streamflow
+hourly,sac_mean,float64,footprint mean SAC-SMA unit streamflow
+hourly,hp_max,float64,footprint maximum hydrophobic unit streamflow
+hourly,hp_mean,float64,footprint mean hydrophobic unit streamflow
+hourly,ffg1h_max,float64,"footprint maximum QPE/FFG ratio, 1 h"
+hourly,ffg1h_mean,float64,"footprint mean QPE/FFG ratio, 1 h"
+hourly,ffg3h_max,float64,"footprint maximum QPE/FFG ratio, 3 h"
+hourly,ffg3h_mean,float64,"footprint mean QPE/FFG ratio, 3 h"
+hourly,ffg6h_max,float64,"footprint maximum QPE/FFG ratio, 6 h"
+hourly,ffg6h_mean,float64,"footprint mean QPE/FFG ratio, 6 h"
+hourly,ffgmax_max,float64,"footprint maximum QPE/FFG ratio, max window"
+hourly,ffgmax_mean,float64,"footprint mean QPE/FFG ratio, max window"
+huc8,huc8,str,"8 digit hydrologic unit code (USGS WBD), string with leading zero"
+huc8,name,str,watershed name (WBD)
+huc8,states,str,states the watershed spans
+huc8,area_km2,float64,"watershed area, km2"
+huc8,min_lon,float64,bounding box
+huc8,min_lat,float64,bounding box
+huc8,max_lon,float64,bounding box
+huc8,max_lat,float64,bounding box
+huc8,n_gages,int64,RUNOFF USGS gages in the watershed
+huc8,gage_ids,str,"their site numbers, semicolon separated"
+huc8,n_episodes,int64,episodes whose footprint contains the watershed
+huc8,n_events_total,int64,"Storm Events reports inside the watershed, all episodes"
+huc8,n_lsr_total,int64,"Local Storm Reports inside the watershed, all episodes"
+huc8,n_flooded_episodes,int64,episodes with at least one report inside the watershed
+huc8,radar_coverage_mean,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: area weighted mean, percent"
+huc8,radar_coverage_min,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: lowest pixel, percent"
+huc8,radar_coverage_max,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: highest pixel, percent"
+huc8,radar_coverage_valid_frac,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed inside the raster (0 = open water or outside the lower 48)"
+huc8,radar_coverage_frac_ge50,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed area with a value at or above 50 percent"
+huc8,radar_coverage_frac_ge100,float64,"hydrologic radar coverage from data/radar_cov.tif (at each 0.01 degree pixel, the percent of the drainage area upstream of that pixel covered by weather radar, 0 to 100), summarized over the pixels of the watershed: share of the watershed area with a value at or above 100 percent"
+gages,site_no,str,"USGS site number, string with leading zero"
+gages,station_name,str,NWIS station name
+gages,lat,float64,gage location
+gages,lon,float64,gage location
+gages,drainage_area_km2,float64,"drainage area, km2 (GAGES-II)"
+gages,huc8,str,HUC8 of the gage
+gages,n_runoff_events,int64,cataloged events linked to the gage in the RUNOFF gaged path (WY 2021-2025)
+gages,basin_polygon,int64,1 if the NLDI drainage basin polygon is available (assets/data/basin/<site_no>.json)
+gages,radar_coverage_at_gage,float64,hydrologic radar coverage at the gage: percent of the basin above the gage covered by weather radar (data/radar_cov.tif)
+episode_gages,"episode_id, huc8, site_no",,one row per RUNOFF gage inside a watershed of the episode footprint
