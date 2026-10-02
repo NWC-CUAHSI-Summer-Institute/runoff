@@ -1,0 +1,11 @@
+pandas
+numpy
+geopandas>=0.14
+pyogrio
+shapely>=2.0
+rasterio
+networkx
+requests
+tqdm
+matplotlib
+jupyter
